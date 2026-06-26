@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'screens/splash_screen.dart';
 
-void main() {
+void main() async {
+  // Ensures Flutter engine is ready before we do anything
+  WidgetsFlutterBinding.ensureInitialized();
+  // Connects app to Firebase using google-services.json
+  await Firebase.initializeApp();
   runApp(const ShopLaneApp());
 }
 
