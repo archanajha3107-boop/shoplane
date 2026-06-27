@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'location_permission_screen.dart';
 
 class RoleSelectionScreen extends StatelessWidget {
   const RoleSelectionScreen({super.key});
@@ -37,7 +38,22 @@ class RoleSelectionScreen extends StatelessWidget {
                 title: 'I am a Customer',
                 subtitle: 'Discover and order from nearby shops',
                 color: const Color(0xFF0F7B6C),
-                onTap: () {},
+                onTap: () {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const LocationPermissionScreen(role: 'customer'),
+    ),
+  );
+},
+onTap: () {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const LocationPermissionScreen(role: 'vendor'),
+    ),
+  );
+},
               ),
               const SizedBox(height: 16),
               _RoleCard(
