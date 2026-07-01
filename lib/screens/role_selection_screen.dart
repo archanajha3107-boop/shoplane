@@ -46,14 +46,7 @@ class RoleSelectionScreen extends StatelessWidget {
     ),
   );
 },
-onTap: () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const LocationPermissionScreen(role: 'vendor'),
-    ),
-  );
-},
+
               ),
               const SizedBox(height: 16),
               _RoleCard(
@@ -61,7 +54,14 @@ onTap: () {
                 title: 'I am a Vendor',
                 subtitle: 'List your shop and receive orders',
                 color: const Color(0xFFE85A2B),
-                onTap: () {},
+                onTap: () {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const LocationPermissionScreen(role: 'vendor'),
+    ),
+  );
+},
               ),
             ],
           ),
