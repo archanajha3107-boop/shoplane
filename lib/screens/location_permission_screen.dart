@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'customer/customer_signup_screen.dart';
+import 'vendor/vendor_signup_screen.dart';
 
 class LocationPermissionScreen extends StatefulWidget {
   final String role;
@@ -29,6 +30,7 @@ class _LocationPermissionScreenState
     }
 
     if (permission == LocationPermission.deniedForever) {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
         _errorMessage =
@@ -39,6 +41,7 @@ class _LocationPermissionScreenState
 
     if (permission == LocationPermission.whileInUse ||
         permission == LocationPermission.always) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
       if (widget.role == 'customer') {
         Navigator.pushReplacement(
@@ -47,7 +50,12 @@ class _LocationPermissionScreenState
               builder: (_) => const CustomerSignupScreen()),
         );
       }
-      // Vendor navigation will be added after vendor signup screen is built
+      else if (widget.role == 'vendor') {
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(builder: (_) => const VendorSignupScreen()),
+  );
+      }
     }
   }
 
@@ -68,7 +76,7 @@ class _LocationPermissionScreenState
               Container(
                 padding: const EdgeInsets.all(28),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0F7B6C).withOpacity(0.1),
+                  color: const Color(0xFF0F7B6C).withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -89,7 +97,7 @@ class _LocationPermissionScreenState
               ),
               const SizedBox(height: 12),
               const Text(
-                'ShopLane uses your location to show nearby vendors and help them deliver to you accurately. This is required to use the app.',
+                'ShopLane uses your location to show nearby vendors and help them deliver to you accurately.',
                 style: TextStyle(
                   fontSize: 15,
                   color: Colors.grey,
@@ -102,13 +110,12 @@ class _LocationPermissionScreenState
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.08),
+                    color: Colors.red.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     _errorMessage!,
-                    style: const TextStyle(
-                        color: Colors.red, fontSize: 13),
+                    style: const TextStyle(color: Colors.red, fontSize: 13),
                     textAlign: TextAlign.center,
                   ),
                 ),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
+import 'customer_login_screen.dart';
+import 'customer_home_screen.dart';
 
 class CustomerSignupScreen extends StatefulWidget {
   const CustomerSignupScreen({super.key});
@@ -19,11 +21,11 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
   bool _isLoading = false;
 
   Future<void> _signup() async {
-    // Basic validation — don't proceed if fields are empty
     if (_nameController.text.isEmpty ||
         _emailController.text.isEmpty ||
         _phoneController.text.isEmpty ||
         _passwordController.text.isEmpty) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill all fields')),
       );
@@ -33,29 +35,32 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await _authService.signUpCustomer(
-        name: _nameController.text.trim(),
-        email: _emailController.text.trim(),
-        phone: _phoneController.text.trim(),
-        password: _passwordController.text,
-        address: _addressController.text.trim(),
-      );
-      // Navigate to customer home after successful signup
-      // Will add navigation once home screen is built
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Account created successfully!'),
-          backgroundColor: Color(0xFF0F7B6C),
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
-    }
-
-    setState(() => _isLoading = false);
+  final customer = await _authService.signUpCustomer(
+    name: _nameController.text.trim(),
+    email: _emailController.text.trim(),
+    phone: _phoneController.text.trim(),
+    password: _passwordController.text,
+    address: _addressController.text.trim(),
+  );
+  if (!mounted) return;
+  if (customer != null) {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CustomerHomeScreen(customer: customer),
+      ),
+      (route) => false,
+    );
   }
+} catch (e) {
+  if (!mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(e.toString())),
+  );
+}
+setState(() => _isLoading = false);
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -126,6 +131,18 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
               ),
             ),
             const SizedBox(height: 40),
+            Center(
+  child: TextButton(
+    onPressed: () => Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const CustomerLoginScreen()),
+    ),
+    child: const Text(
+      'Already have an account? Login',
+      style: TextStyle(color: Color(0xFF0F7B6C)),
+    ),
+  ),
+),
           ],
         ),
       ),

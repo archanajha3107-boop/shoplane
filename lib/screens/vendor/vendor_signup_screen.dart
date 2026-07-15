@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
+import 'vendor_login_screen.dart';
+import 'customer_home_screen.dart';
 
 class VendorSignupScreen extends StatefulWidget {
   const VendorSignupScreen({super.key});
@@ -20,7 +22,6 @@ class _VendorSignupScreenState extends State<VendorSignupScreen> {
   bool _offersDelivery = true;
   bool _offersPickup = true;
 
-  // Category list — matches your Firestore categories collection
   String _selectedCategory = 'Grocery & Provisions';
   final List<String> _categories = [
     'Grocery & Provisions',
@@ -40,6 +41,7 @@ class _VendorSignupScreenState extends State<VendorSignupScreen> {
         _phoneController.text.isEmpty ||
         _passwordController.text.isEmpty ||
         _addressController.text.isEmpty) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill all fields')),
       );
@@ -49,29 +51,31 @@ class _VendorSignupScreenState extends State<VendorSignupScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await _authService.signUpVendor(
-        businessName: _businessNameController.text.trim(),
-        ownerName: _ownerNameController.text.trim(),
-        email: _emailController.text.trim(),
-        phone: _phoneController.text.trim(),
-        password: _passwordController.text,
-        address: _addressController.text.trim(),
-        category: _selectedCategory,
-      );
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Shop registered successfully!'),
-          backgroundColor: Color(0xFF0F7B6C),
-        ),
-      );
-      // Navigation to vendor home will be added next
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
-    }
-
-    setState(() => _isLoading = false);
+  final user = await _authService.login(
+    email: _emailController.text.trim(),
+    password: _passwordController.text,
+  );
+  if (!mounted) return;
+  if (user != null && user.role == 'customer') {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CustomerHomeScreen(customer: user),
+      ),
+      (route) => false,
+    );
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Account not found or wrong role')),
+    );
+  }
+} catch (e) {
+  if (!mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(e.toString())),
+  );
+}
+setState(() => _isLoading = false);
   }
 
   @override
@@ -125,8 +129,6 @@ class _VendorSignupScreenState extends State<VendorSignupScreen> {
             _buildField('Shop Address', _addressController,
                 Icons.location_on_outlined),
             const SizedBox(height: 16),
-
-            // Category dropdown — vendor selects what type of shop they are
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
@@ -152,8 +154,6 @@ class _VendorSignupScreenState extends State<VendorSignupScreen> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // Delivery/pickup toggles
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -209,14 +209,26 @@ class _VendorSignupScreenState extends State<VendorSignupScreen> {
                   ),
                 ),
                 child: _isLoading
-                    ? const CircularProgressIndicator(
-                        color: Colors.white)
+                    ? const CircularProgressIndicator(color: Colors.white)
                     : const Text(
                         'Register Shop',
                         style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold),
+                            fontSize: 16, fontWeight: FontWeight.bold),
                       ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Center(
+              child: TextButton(
+                onPressed: () => Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const VendorLoginScreen()),
+                ),
+                child: const Text(
+                  'Already registered? Login',
+                  style: TextStyle(color: Color(0xFFE85A2B)),
+                ),
               ),
             ),
             const SizedBox(height: 40),
