@@ -7,7 +7,11 @@ class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   // ── PRODUCTS ──────────────────────────────────────────────
-
+Future<OrderModel?> getOrder(String orderId) async {
+  final doc = await _db.collection('orders').doc(orderId).get();
+  if (!doc.exists) return null;
+  return OrderModel.fromMap(doc.data()!, doc.id);
+}
   Future<void> addProduct(ProductModel product) async {
     await _db.collection('products').add(product.toMap());
   }
@@ -99,6 +103,11 @@ class FirestoreService {
   Future<void> toggleShopOpen(String vendorId, bool isOpen) async {
     await _db.collection('users').doc(vendorId).update({'isOpen': isOpen});
   }
+
+  Future<void> updateVendorSettings(
+    String vendorId, Map<String, dynamic> data) async {
+  await _db.collection('users').doc(vendorId).update(data);
+}
 
   // ── MY SHOPS ──────────────────────────────────────────────
 

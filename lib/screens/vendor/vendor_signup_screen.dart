@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import 'vendor_login_screen.dart';
-import 'customer_home_screen.dart';
+import 'vendor_dashboard_screen.dart';
 
 class VendorSignupScreen extends StatefulWidget {
   const VendorSignupScreen({super.key});
@@ -34,49 +34,50 @@ class _VendorSignupScreenState extends State<VendorSignupScreen> {
     'Other',
   ];
 
-  Future<void> _signup() async {
-    if (_businessNameController.text.isEmpty ||
-        _ownerNameController.text.isEmpty ||
-        _emailController.text.isEmpty ||
-        _phoneController.text.isEmpty ||
-        _passwordController.text.isEmpty ||
-        _addressController.text.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all fields')),
-      );
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-  final user = await _authService.login(
-    email: _emailController.text.trim(),
-    password: _passwordController.text,
-  );
-  if (!mounted) return;
-  if (user != null && user.role == 'customer') {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(
-        builder: (_) => CustomerHomeScreen(customer: user),
-      ),
-      (route) => false,
-    );
-  } else {
+ Future<void> _signup() async {
+  if (_businessNameController.text.isEmpty ||
+      _ownerNameController.text.isEmpty ||
+      _emailController.text.isEmpty ||
+      _phoneController.text.isEmpty ||
+      _passwordController.text.isEmpty ||
+      _addressController.text.isEmpty) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Account not found or wrong role')),
+      const SnackBar(content: Text('Please fill all fields')),
+    );
+    return;
+  }
+
+  setState(() => _isLoading = true);
+
+  try {
+    final vendor = await _authService.signUpVendor(
+      businessName: _businessNameController.text.trim(),
+      ownerName: _ownerNameController.text.trim(),
+      email: _emailController.text.trim(),
+      phone: _phoneController.text.trim(),
+      password: _passwordController.text,
+      address: _addressController.text.trim(),
+      category: _selectedCategory,
+    );
+    if (!mounted) return;
+    if (vendor != null) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (_) => VendorDashboardScreen(vendor: vendor),
+        ),
+        (route) => false,
+      );
+    }
+  } catch (e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(e.toString())),
     );
   }
-} catch (e) {
-  if (!mounted) return;
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(e.toString())),
-  );
+  setState(() => _isLoading = false);
 }
-setState(() => _isLoading = false);
-  }
 
   @override
   Widget build(BuildContext context) {

@@ -5,6 +5,8 @@ import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../role_selection_screen.dart';
 import 'product_catalog_screen.dart';
+import 'vendor_settings_screen.dart';
+import 'khata_screen.dart';
 
 class VendorDashboardScreen extends StatefulWidget {
   final UserModel vendor;
@@ -143,15 +145,25 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                   icon: Icons.book_rounded,
                   label: 'Khata',
                   color: const Color(0xFFC9A227),
-                  onTap: () {},
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => KhataScreen(vendorId: widget.vendor.uid),
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 12),
-                _ActionCard(
-                  icon: Icons.settings_rounded,
-                  label: 'Settings',
-                  color: Colors.grey,
-                  onTap: () {},
-                ),
+                  _ActionCard(
+                    icon: Icons.settings_rounded,
+                    label: 'Settings',
+                    color: Colors.grey,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => VendorSettingsScreen(vendor: widget.vendor),
+                      ),
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: 24),

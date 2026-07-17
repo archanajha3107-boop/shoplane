@@ -4,6 +4,7 @@ import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../role_selection_screen.dart';
 import 'shop_detail_screen.dart';
+import 'customer_profile_screen.dart';
 
 class CustomerHomeScreen extends StatefulWidget {
   final UserModel customer;
@@ -29,6 +30,16 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         foregroundColor: Colors.white,
         title: const Text('ShopLane'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.person_outline_rounded),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CustomerProfileScreen(
+                    customer: widget.customer),
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
