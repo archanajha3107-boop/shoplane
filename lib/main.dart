@@ -1,12 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'screens/splash_screen.dart';
 
-void main() async {
-  // Ensures Flutter engine is ready before we do anything
-  WidgetsFlutterBinding.ensureInitialized();
-  // Connects app to Firebase using google-services.json
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(
+    RemoteMessage message) async {
   await Firebase.initializeApp();
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+
+  // Background message handler
+  FirebaseMessaging.onBackgroundMessage(
+      _firebaseMessagingBackgroundHandler);
+
+  // Request notification permission
+  await FirebaseMessaging.instance.requestPermission(
+    alert: true,
+    badge: true,
+    sound: true,
+  );
+
+  // Foreground notification handler
+  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    // App is open — the dashboard StreamBuilder will update automatically
+    // No additional handling needed for vendor dashboard
+  });
+
   runApp(const ShopLaneApp());
 }
 
@@ -25,7 +48,6 @@ class ShopLaneApp extends StatelessWidget {
           secondary: const Color(0xFFE85A2B),
         ),
         scaffoldBackgroundColor: const Color(0xFFF2F1EF),
-        fontFamily: 'Mukta',
         useMaterial3: true,
       ),
       home: const SplashScreen(),

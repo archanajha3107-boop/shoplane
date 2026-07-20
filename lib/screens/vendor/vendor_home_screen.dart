@@ -58,6 +58,7 @@ class _VendorSignupScreenState extends State<VendorSignupScreen> {
         address: _addressController.text.trim(),
         category: _selectedCategory,
       );
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Shop registered successfully!'),
@@ -66,11 +67,13 @@ class _VendorSignupScreenState extends State<VendorSignupScreen> {
       );
       // Navigation to vendor home will be added next
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString())),
       );
     }
 
+    if (!mounted) return;
     setState(() => _isLoading = false);
   }
 
@@ -169,7 +172,7 @@ class _VendorSignupScreenState extends State<VendorSignupScreen> {
                           style: TextStyle(fontSize: 15)),
                       Switch(
                         value: _offersDelivery,
-                        activeColor: const Color(0xFF0F7B6C),
+                        activeThumbColor: const Color(0xFF0F7B6C),
                         onChanged: (val) =>
                             setState(() => _offersDelivery = val),
                       ),
@@ -182,7 +185,7 @@ class _VendorSignupScreenState extends State<VendorSignupScreen> {
                           style: TextStyle(fontSize: 15)),
                       Switch(
                         value: _offersPickup,
-                        activeColor: const Color(0xFF0F7B6C),
+                        activeThumbColor: const Color(0xFF0F7B6C),
                         onChanged: (val) =>
                             setState(() => _offersPickup = val),
                       ),

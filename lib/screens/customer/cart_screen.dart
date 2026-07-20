@@ -298,17 +298,18 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  Widget _paymentTile(
-      String value, String label, IconData icon) {
+  Widget _paymentTile(String value, String label, IconData icon) {
+    final selected = _payment == value;
     return ListTile(
-      leading: Icon(icon, color: const Color(0xFF0F7B6C)),
-      title: Text(label),
-      trailing: Radio<String>(
-        value: value,
-        groupValue: _payment,
-        onChanged: (v) => setState(() => _payment = v!),
-        activeColor: const Color(0xFF0F7B6C),
+      leading: Icon(
+        icon,
+        color: selected ? const Color(0xFF0F7B6C) : Colors.grey,
       ),
+      title: Text(label),
+      trailing: selected
+          ? const Icon(Icons.check_circle_rounded,
+              color: Color(0xFF0F7B6C))
+          : const Icon(Icons.circle_outlined, color: Colors.grey),
       onTap: () => setState(() => _payment = value),
     );
   }

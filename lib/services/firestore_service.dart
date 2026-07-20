@@ -2,16 +2,49 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/product_model.dart';
 import '../models/order_model.dart';
 import '../models/user_model.dart';
+import 'dart:math';
 
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
+  double _haversineDistance(
+      double lat1, double lon1, double lat2, double lon2) {
+    const R = 6371.0; // Earth radius in km
+    final dLat = (lat2 - lat1) * pi / 180;
+    final dLon = (lon2 - lon1) * pi / 180;
+    final a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(lat1 * pi / 180) *
+            cos(lat2 * pi / 180) *
+            sin(dLon / 2) *
+            sin(dLon / 2);
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return R * c;
+  }
+
   // ── PRODUCTS ──────────────────────────────────────────────
-Future<OrderModel?> getOrder(String orderId) async {
-  final doc = await _db.collection('orders').doc(orderId).get();
-  if (!doc.exists) return null;
-  return OrderModel.fromMap(doc.data()!, doc.id);
-}
+  Future<OrderModel?> getLastOrderFromShop(
+      String customerId, String sellerId) async {
+    try {
+      final snap = await _db
+          .collection('orders')
+          .where('customerId', isEqualTo: customerId)
+          .where('sellerId', isEqualTo: sellerId)
+          .orderBy('createdAt', descending: true)
+          .limit(1)
+          .get();
+      if (snap.docs.isEmpty) return null;
+      return OrderModel.fromMap(snap.docs.first.data(), snap.docs.first.id);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  Future<OrderModel?> getOrder(String orderId) async {
+    final doc = await _db.collection('orders').doc(orderId).get();
+    if (!doc.exists) return null;
+    return OrderModel.fromMap(doc.data()!, doc.id);
+  }
+
   Future<void> addProduct(ProductModel product) async {
     await _db.collection('products').add(product.toMap());
   }
@@ -50,9 +83,58 @@ Future<OrderModel?> getOrder(String orderId) async {
 
   // ── ORDERS ────────────────────────────────────────────────
 
+  Future<void> sendOrderNotification({
+    required String vendorFcmToken,
+    required String customerName,
+    required double total,
+    required String orderId,
+  }) async {
+    await _db.collection('notifications').add({
+      'to': vendorFcmToken,
+      'title': 'New Order!',
+      'body': '$customerName placed an order for ₹${total.toStringAsFixed(0)}',
+      'orderId': orderId,
+      'createdAt': FieldValue.serverTimestamp(),
+      'sent': false,
+    });
+  }
+
   Future<String> placeOrder(OrderModel order) async {
     final ref = await _db.collection('orders').add(order.toMap());
+
+    try {
+      final vendorDoc = await _db
+          .collection('users')
+          .doc(order.sellerId)
+          .get();
+      final vendorToken =
+          vendorDoc.data()?['fcmToken'] as String? ?? '';
+      if (vendorToken.isNotEmpty) {
+        await sendOrderNotification(
+          vendorFcmToken: vendorToken,
+          customerName: order.customerName,
+          total: order.total,
+          orderId: ref.id,
+        );
+      }
+    } catch (e) {
+      // Notification failure should not block order placement
+    }
+
     return ref.id;
+  }
+
+  Future<double> getCommunityImpact() async {
+    final snap = await _db
+        .collection('orders')
+        .where('status', isEqualTo: 'delivered')
+        .get();
+
+    double total = 0;
+    for (final doc in snap.docs) {
+      total += (doc.data()['total'] as num? ?? 0).toDouble();
+    }
+    return total;
   }
 
   Future<void> updateOrderStatus(String orderId, String status) async {
@@ -90,15 +172,62 @@ Future<OrderModel?> getOrder(String orderId) async {
 
   // ── VENDORS (for customer home) ───────────────────────────
 
-  Future<List<UserModel>> getNearbyVendors() async {
-    final snap = await _db
-        .collection('users')
-        .where('role', isEqualTo: 'vendor')
-        .get();
-    return snap.docs
-        .map((d) => UserModel.fromMap(d.data(), d.id))
-        .toList();
+  Future<List<UserModel>> getNearbyVendors({
+  double? customerLat,
+  double? customerLng,
+  double radiusKm = 10,
+}) async {
+  final snap = await _db
+      .collection('users')
+      .where('role', isEqualTo: 'vendor')
+      .get();
+
+  final vendors = snap.docs
+      .map((d) => UserModel.fromMap(d.data(), d.id))
+      .toList();
+
+  // If we have customer location, sort by distance and filter by radius
+  if (customerLat != null && customerLng != null) {
+    final vendorsWithDistance = vendors.where((v) {
+      if (v.location == null) return true; // show vendors with no location
+      final dist = _haversineDistance(
+        customerLat,
+        customerLng,
+        v.location!.latitude,
+        v.location!.longitude,
+      );
+      return dist <= radiusKm;
+    }).toList();
+
+    vendorsWithDistance.sort((a, b) {
+      if (a.location == null) return 1;
+      if (b.location == null) return -1;
+      final distA = _haversineDistance(
+          customerLat, customerLng,
+          a.location!.latitude, a.location!.longitude);
+      final distB = _haversineDistance(
+          customerLat, customerLng,
+          b.location!.latitude, b.location!.longitude);
+      return distA.compareTo(distB);
+    });
+
+    return vendorsWithDistance;
   }
+
+  return vendors;
+}
+
+// Helper to get distance string for UI display
+String getDistanceString(
+    double customerLat, double customerLng, UserModel vendor) {
+  if (vendor.location == null) return '';
+  final dist = _haversineDistance(
+    customerLat, customerLng,
+    vendor.location!.latitude, vendor.location!.longitude,
+  );
+  if (dist < 1) return '${(dist * 1000).toStringAsFixed(0)}m';
+  return '${dist.toStringAsFixed(1)}km';
+}
 
   Future<void> toggleShopOpen(String vendorId, bool isOpen) async {
     await _db.collection('users').doc(vendorId).update({'isOpen': isOpen});

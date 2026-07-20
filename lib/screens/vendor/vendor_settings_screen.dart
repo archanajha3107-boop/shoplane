@@ -186,7 +186,7 @@ class _VendorSettingsScreenState extends State<VendorSettingsScreen> {
               color: Color(0xFF2C2C2C))),
       value: value,
       onChanged: onChanged,
-      activeColor: const Color(0xFF0F7B6C),
+      activeThumbColor: const Color(0xFF0F7B6C),
     );
   }
 }

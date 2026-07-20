@@ -5,7 +5,9 @@ class LocationService {
   Future<Position?> getCurrentPosition() async {
     try {
       return await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
     } catch (e) {
       return null;

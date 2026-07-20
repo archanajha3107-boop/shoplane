@@ -119,7 +119,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   Switch(
                     value: _inStock,
                     onChanged: (v) => setState(() => _inStock = v),
-                    activeColor: const Color(0xFF0F7B6C),
+                    activeThumbColor: const Color(0xFF0F7B6C),
                   ),
                 ],
               ),
@@ -148,7 +148,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
                           value: _isVariableStock,
                           onChanged: (v) =>
                               setState(() => _isVariableStock = v),
-                          activeColor: const Color(0xFF0F7B6C),
+                          activeThumbColor: const Color(0xFF0F7B6C),
                         ),
                       ],
                     ),

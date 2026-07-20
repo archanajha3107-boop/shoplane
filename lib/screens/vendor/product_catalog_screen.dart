@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/product_model.dart';
 import '../../services/firestore_service.dart';
 import 'add_product_screen.dart';
+import 'voice_product_screen.dart';
 
 class ProductCatalogScreen extends StatelessWidget {
   final String vendorId;
@@ -18,16 +19,36 @@ class ProductCatalogScreen extends StatelessWidget {
         foregroundColor: Colors.white,
         title: const Text('My Products'),
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFFE85A2B),
-        foregroundColor: Colors.white,
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => AddProductScreen(vendorId: vendorId),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'voice',
+            backgroundColor: const Color(0xFF0F7B6C),
+            foregroundColor: Colors.white,
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => VoiceProductScreen(vendorId: vendorId),
+              ),
+            ),
+            icon: const Icon(Icons.mic),
+            label: const Text('Voice'),
           ),
-        ),
-        child: const Icon(Icons.add),
+          const SizedBox(height: 12),
+          FloatingActionButton(
+            heroTag: 'add',
+            backgroundColor: const Color(0xFFE85A2B),
+            foregroundColor: Colors.white,
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => AddProductScreen(vendorId: vendorId),
+              ),
+            ),
+            child: const Icon(Icons.add),
+          ),
+        ],
       ),
       body: StreamBuilder<List<ProductModel>>(
         stream: fs.vendorProducts(vendorId),
@@ -137,7 +158,7 @@ class _ProductTile extends StatelessWidget {
           Switch(
             value: product.inStock,
             onChanged: onToggle,
-            activeColor: const Color(0xFF0F7B6C),
+            activeThumbColor: const Color(0xFF0F7B6C),
           ),
         ],
       ),

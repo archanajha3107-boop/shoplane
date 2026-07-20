@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
@@ -16,10 +17,68 @@ class CustomerHomeScreen extends StatefulWidget {
 
 class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   String _selectedCategory = 'All';
+  String _searchQuery = '';
+  double? _customerLat;
+  double? _customerLng;
+  List<UserModel> _allVendors = [];
+  bool _loading = true;
+
   final List<String> _categories = [
-    'All', 'Groceries', 'Vegetables',
-    'Fruits', 'Dairy', 'Meat & Fish', 'Snacks'
+    'All', 'Grocery & Provisions', 'Vegetables & Fruits',
+    'Milk & Dairy', 'Meat & Fish', 'Snacks & Food Stalls',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLocationAndVendors();
+  }
+
+  Future<void> _loadLocationAndVendors() async {
+    setState(() => _loading = true);
+
+    // Get customer GPS
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+      _customerLat = pos.latitude;
+      _customerLng = pos.longitude;
+    } catch (e) {
+      // Use stored location from profile if GPS fails
+      if (widget.customer.location != null) {
+        _customerLat = widget.customer.location!.latitude;
+        _customerLng = widget.customer.location!.longitude;
+      }
+    }
+
+    // Fetch vendors sorted by distance
+    final vendors = await FirestoreService().getNearbyVendors(
+      customerLat: _customerLat,
+      customerLng: _customerLng,
+    );
+
+    if (mounted) {
+      setState(() {
+        _allVendors = vendors;
+        _loading = false;
+      });
+    }
+  }
+
+  List<UserModel> get _filteredVendors {
+    return _allVendors.where((v) {
+      final matchesCategory = _selectedCategory == 'All' ||
+          v.category == _selectedCategory;
+      final matchesSearch = _searchQuery.isEmpty ||
+          (v.businessName ?? v.name)
+              .toLowerCase()
+              .contains(_searchQuery.toLowerCase());
+      return matchesCategory && matchesSearch;
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,8 +94,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => CustomerProfileScreen(
-                    customer: widget.customer),
+                builder: (_) =>
+                    CustomerProfileScreen(customer: widget.customer),
               ),
             ),
           ),
@@ -55,119 +114,168 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           ),
         ],
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Hi, ${widget.customer.name.split(' ').first}!',
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2C2C2C),
+      body: RefreshIndicator(
+        color: const Color(0xFF0F7B6C),
+        onRefresh: _loadLocationAndVendors,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Greeting + search
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Hi, ${widget.customer.name.split(' ').first}!',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2C2C2C),
+                    ),
                   ),
-                ),
-                const Text('What do you need today?',
-                    style:
-                        TextStyle(fontSize: 15, color: Colors.grey)),
-              ],
+                  const Text('What do you need today?',
+                      style: TextStyle(
+                          fontSize: 14, color: Colors.grey)),
+                  const SizedBox(height: 12),
+                  FutureBuilder<double>(
+                    future: FirestoreService().getCommunityImpact(),
+                    builder: (context, snap) {
+                      if (!snap.hasData) return const SizedBox.shrink();
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F7B6C),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.favorite_rounded,
+                                color: Colors.white, size: 18),
+                            const SizedBox(width: 8),
+                            Text(
+                              '₹${snap.data!.toStringAsFixed(0)} kept in your neighbourhood this month',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                  // Search bar
+                  TextField(
+                    onChanged: (v) =>
+                        setState(() => _searchQuery = v),
+                    decoration: InputDecoration(
+                      hintText: 'Search shops...',
+                      prefixIcon: const Icon(Icons.search,
+                          color: Color(0xFF0F7B6C)),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding:
+                          const EdgeInsets.symmetric(vertical: 0),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          // Category chips
-          SizedBox(
-            height: 40,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _categories.length,
-              itemBuilder: (context, i) {
-                final cat = _categories[i];
-                final selected = cat == _selectedCategory;
-                return GestureDetector(
-                  onTap: () =>
-                      setState(() => _selectedCategory = cat),
-                  child: Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? const Color(0xFF0F7B6C)
-                          : Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
+            // Category chips
+            SizedBox(
+              height: 40,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: _categories.length,
+                itemBuilder: (context, i) {
+                  final cat = _categories[i];
+                  final selected = cat == _selectedCategory;
+                  return GestureDetector(
+                    onTap: () =>
+                        setState(() => _selectedCategory = cat),
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
                         color: selected
                             ? const Color(0xFF0F7B6C)
-                            : Colors.grey.withValues(alpha: 0.3),
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: selected
+                              ? const Color(0xFF0F7B6C)
+                              : Colors.grey.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Text(
+                        cat,
+                        style: TextStyle(
+                          color: selected
+                              ? Colors.white
+                              : const Color(0xFF2C2C2C),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
-                    child: Text(
-                      cat,
-                      style: TextStyle(
-                        color: selected
-                            ? Colors.white
-                            : const Color(0xFF2C2C2C),
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              'Nearby Shops',
-              style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2C2C2C)),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: FutureBuilder<List<UserModel>>(
-              future: FirestoreService().getNearbyVendors(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState ==
-                    ConnectionState.waiting) {
-                  return const Center(
-                      child: CircularProgressIndicator(
-                          color: Color(0xFF0F7B6C)));
-                }
-                final vendors = snapshot.data ?? [];
-                final filtered = _selectedCategory == 'All'
-                    ? vendors
-                    : vendors
-                        .where((v) =>
-                            v.category == _selectedCategory)
-                        .toList();
-                if (filtered.isEmpty) {
-                  return const Center(
-                    child: Text('No shops found in this category',
-                        style: TextStyle(color: Colors.grey)),
                   );
-                }
-                return ListView.builder(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: filtered.length,
-                  itemBuilder: (context, i) =>
-                      _ShopCard(vendor: filtered[i],
-                        customer: widget.customer),
-                );
-              },
+                },
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  const Text(
+                    'Nearby Shops',
+                    style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2C2C2C)),
+                  ),
+                  const SizedBox(width: 8),
+                  if (_customerLat != null)
+                    const Icon(Icons.location_on,
+                        color: Color(0xFF0F7B6C), size: 14),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Vendor list
+            Expanded(
+              child: _loading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                          color: Color(0xFF0F7B6C)))
+                  : _filteredVendors.isEmpty
+                      ? const Center(
+                          child: Text('No shops found',
+                              style: TextStyle(color: Colors.grey)))
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16),
+                          itemCount: _filteredVendors.length,
+                          itemBuilder: (context, i) => _ShopCard(
+                            vendor: _filteredVendors[i],
+                            customer: widget.customer,
+                            customerLat: _customerLat,
+                            customerLng: _customerLng,
+                          ),
+                        ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -176,10 +284,26 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
 class _ShopCard extends StatelessWidget {
   final UserModel vendor;
   final UserModel customer;
-  const _ShopCard({required this.vendor, required this.customer});
+  final double? customerLat;
+  final double? customerLng;
+
+  const _ShopCard({
+    required this.vendor,
+    required this.customer,
+    this.customerLat,
+    this.customerLng,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final fs = FirestoreService();
+    final distStr = (customerLat != null &&
+            customerLng != null &&
+            vendor.location != null)
+        ? fs.getDistanceString(
+            customerLat!, customerLng!, vendor)
+        : '';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -198,13 +322,12 @@ class _ShopCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Expanded(
                 child: Text(
                   vendor.businessName ?? vendor.name,
                   style: const TextStyle(
-                      fontSize: 17,
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF2C2C2C)),
                 ),
@@ -237,51 +360,77 @@ class _ShopCard extends StatelessWidget {
           const SizedBox(height: 6),
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFC9A227).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(20),
+              if (vendor.category != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFC9A227)
+                        .withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    vendor.category!,
+                    style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFFC9A227),
+                        fontWeight: FontWeight.w600),
+                  ),
                 ),
-                child: Text(
-                  vendor.category ?? 'General',
+              if (distStr.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.near_me,
+                        size: 12, color: Colors.grey),
+                    const SizedBox(width: 2),
+                    Text(distStr,
+                        style: const TextStyle(
+                            color: Colors.grey, fontSize: 12)),
+                  ],
+                ),
+              ],
+              if (vendor.deliveryFee != null) ...[
+                const SizedBox(width: 8),
+                Text(
+                  'Delivery ₹${vendor.deliveryFee!.toStringAsFixed(0)}',
                   style: const TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFFC9A227),
-                      fontWeight: FontWeight.w600),
+                      color: Colors.grey, fontSize: 12),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Delivery ₹${vendor.deliveryFee?.toStringAsFixed(0) ?? '0'}',
-                style: const TextStyle(
-                    color: Colors.grey, fontSize: 12),
-              ),
+              ],
             ],
           ),
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ShopDetailScreen(
-                    vendor: vendor,
-                    customer: customer,
-                  ),
-                ),
-              ),
+              onPressed: (vendor.isOpen ?? false)
+                  ? () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ShopDetailScreen(
+                            vendor: vendor,
+                            customer: customer,
+                          ),
+                        ),
+                      )
+                  : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFE85A2B),
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 10),
+                disabledBackgroundColor: Colors.grey.shade300,
+                padding:
+                    const EdgeInsets.symmetric(vertical: 10),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8)),
               ),
-              child: const Text('Order Now',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
+              child: Text(
+                (vendor.isOpen ?? false)
+                    ? 'Order Now'
+                    : 'Shop Closed',
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold),
+              ),
             ),
           ),
         ],

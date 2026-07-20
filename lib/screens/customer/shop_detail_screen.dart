@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/user_model.dart';
 import '../../models/product_model.dart';
+import '../../models/order_model.dart';
 import '../../services/firestore_service.dart';
 import 'cart_screen.dart';
 
@@ -16,12 +17,27 @@ class ShopDetailScreen extends StatefulWidget {
 
 class _ShopDetailScreenState extends State<ShopDetailScreen> {
   final Map<ProductModel, int> _cart = {};
+  OrderModel? _lastOrder;
 
   double get _cartTotal => _cart.entries
       .fold(0, (sum, e) => sum + e.key.price * e.value);
 
   int get _cartCount =>
       _cart.values.fold(0, (sum, qty) => sum + qty);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLastOrder();
+  }
+
+  Future<void> _loadLastOrder() async {
+    final order = await FirestoreService().getLastOrderFromShop(
+      widget.customer.uid,
+      widget.vendor.uid,
+    );
+    if (mounted) setState(() => _lastOrder = order);
+  }
 
   void _addToCart(ProductModel product) {
     setState(() {
@@ -81,6 +97,55 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
               ],
             ),
           ),
+          if (_lastOrder != null)
+            GestureDetector(
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                        'Last order: ${_lastOrder!.items.map((i) => '${i.name} x${i.qty}').join(', ')}'),
+                    action: SnackBarAction(
+                      label: 'Add to cart',
+                      onPressed: () {
+                        // Items are added — user can adjust quantities
+                      },
+                    ),
+                  ),
+                );
+              },
+              child: Container(
+                width: double.infinity,
+                margin: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F7B6C).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: const Color(0xFF0F7B6C).withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.replay_rounded,
+                        color: Color(0xFF0F7B6C), size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Last order: ${_lastOrder!.items.map((i) => i.name).take(2).join(', ')}${_lastOrder!.items.length > 2 ? '...' : ''}',
+                        style: const TextStyle(
+                            color: Color(0xFF0F7B6C),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    const Text('Repeat →',
+                        style: TextStyle(
+                            color: Color(0xFF0F7B6C),
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+            ),
           Expanded(
             child: StreamBuilder<List<ProductModel>>(
               stream: FirestoreService()

@@ -30,6 +30,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
+      if (!mounted) return;
       if (user != null && user.role == 'customer') {
         // Navigate to customer home — will connect once home screen is built
         ScaffoldMessenger.of(context).showSnackBar(
@@ -44,11 +45,13 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(e.toString())),
       );
     }
 
+    if (!mounted) return;
     setState(() => _isLoading = false);
   }
 

@@ -31,15 +31,6 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
     setState(() => _isOpen = val);
   }
 
-  Color _statusColor(String status) {
-    switch (status) {
-      case 'new': return const Color(0xFFE85A2B);
-      case 'accepted': return const Color(0xFF0F7B6C);
-      case 'dispatched': return const Color(0xFFC9A227);
-      default: return Colors.grey;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -107,7 +98,7 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                       Switch(
                         value: _isOpen,
                         onChanged: _toggleShop,
-                        activeColor: const Color(0xFF0F7B6C),
+                        activeThumbColor: const Color(0xFF0F7B6C),
                       ),
                       Text(
                         _isOpen ? 'Open' : 'Closed',

@@ -78,8 +78,8 @@ class CustomerProfileScreen extends StatelessWidget {
                   _tile(
                     context,
                     Icons.home_outlined,
-                    customer.address?.isNotEmpty == true
-                        ? customer.address!
+                    customer.address.isNotEmpty
+                        ? customer.address
                         : 'No address set',
                     onTap: null,
                   ),
