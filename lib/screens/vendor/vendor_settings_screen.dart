@@ -3,14 +3,15 @@ import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
 import '../role_selection_screen.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class VendorSettingsScreen extends StatefulWidget {
   final UserModel vendor;
   const VendorSettingsScreen({super.key, required this.vendor});
 
   @override
-  State<VendorSettingsScreen> createState() =>
-      _VendorSettingsScreenState();
+  State<VendorSettingsScreen> createState() => _VendorSettingsScreenState();
 }
 
 class _VendorSettingsScreenState extends State<VendorSettingsScreen> {
@@ -31,18 +32,41 @@ class _VendorSettingsScreenState extends State<VendorSettingsScreen> {
     _minOrder = widget.vendor.minOrderValue ?? 0;
   }
 
+  Future<void> _updateLocation() async {
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.vendor.uid)
+          .update({'location': GeoPoint(pos.latitude, pos.longitude)});
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Location updated successfully'),
+          backgroundColor: Color(0xFF0F7B6C),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Location update failed: $e')));
+    }
+  }
+
   Future<void> _save() async {
     setState(() => _saving = true);
-    await FirestoreService().updateVendorSettings(
-      widget.vendor.uid,
-      {
-        'isOpen': _isOpen,
-        'offersDelivery': _offersDelivery,
-        'offersPickup': _offersPickup,
-        'deliveryFee': _deliveryFee,
-        'minOrderValue': _minOrder,
-      },
-    );
+    await FirestoreService().updateVendorSettings(widget.vendor.uid, {
+      'isOpen': _isOpen,
+      'offersDelivery': _offersDelivery,
+      'offersPickup': _offersPickup,
+      'deliveryFee': _deliveryFee,
+      'minOrderValue': _minOrder,
+    });
     setState(() => _saving = false);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -64,10 +88,13 @@ class _VendorSettingsScreenState extends State<VendorSettingsScreen> {
         actions: [
           TextButton(
             onPressed: _saving ? null : _save,
-            child: const Text('Save',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Save',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -76,16 +103,25 @@ class _VendorSettingsScreenState extends State<VendorSettingsScreen> {
         child: Column(
           children: [
             _card([
-              _switchTile('Shop Open', _isOpen,
-                  (v) => setState(() => _isOpen = v)),
+              _switchTile(
+                'Shop Open',
+                _isOpen,
+                (v) => setState(() => _isOpen = v),
+              ),
             ]),
             const SizedBox(height: 12),
             _card([
-              _switchTile('Offers Delivery', _offersDelivery,
-                  (v) => setState(() => _offersDelivery = v)),
+              _switchTile(
+                'Offers Delivery',
+                _offersDelivery,
+                (v) => setState(() => _offersDelivery = v),
+              ),
               const Divider(height: 1),
-              _switchTile('Offers Pickup', _offersPickup,
-                  (v) => setState(() => _offersPickup = v)),
+              _switchTile(
+                'Offers Pickup',
+                _offersPickup,
+                (v) => setState(() => _offersPickup = v),
+              ),
               const Divider(height: 1),
               ListTile(
                 title: const Text('Delivery Fee (₹)'),
@@ -93,13 +129,13 @@ class _VendorSettingsScreenState extends State<VendorSettingsScreen> {
                   width: 80,
                   child: TextField(
                     controller: TextEditingController(
-                        text: _deliveryFee.toStringAsFixed(0)),
+                      text: _deliveryFee.toStringAsFixed(0),
+                    ),
                     keyboardType: TextInputType.number,
                     textAlign: TextAlign.right,
-                    decoration: const InputDecoration(
-                        border: InputBorder.none),
-                    onChanged: (v) => _deliveryFee =
-                        double.tryParse(v) ?? _deliveryFee,
+                    decoration: const InputDecoration(border: InputBorder.none),
+                    onChanged: (v) =>
+                        _deliveryFee = double.tryParse(v) ?? _deliveryFee,
                   ),
                 ),
               ),
@@ -110,11 +146,11 @@ class _VendorSettingsScreenState extends State<VendorSettingsScreen> {
                   width: 80,
                   child: TextField(
                     controller: TextEditingController(
-                        text: _minOrder.toStringAsFixed(0)),
+                      text: _minOrder.toStringAsFixed(0),
+                    ),
                     keyboardType: TextInputType.number,
                     textAlign: TextAlign.right,
-                    decoration: const InputDecoration(
-                        border: InputBorder.none),
+                    decoration: const InputDecoration(border: InputBorder.none),
                     onChanged: (v) =>
                         _minOrder = double.tryParse(v) ?? _minOrder,
                   ),
@@ -124,8 +160,39 @@ class _VendorSettingsScreenState extends State<VendorSettingsScreen> {
             const SizedBox(height: 12),
             _card([
               ListTile(
-                leading: const Icon(Icons.developer_board_rounded,
-                    color: Color(0xFF0F7B6C)),
+                leading: const Icon(
+                  Icons.my_location_rounded,
+                  color: Color(0xFF0F7B6C),
+                ),
+                title: const Text('Update Shop Location'),
+                subtitle: const Text(
+                  'Customers need this to find you nearby',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                trailing: ElevatedButton(
+                  onPressed: _updateLocation,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0F7B6C),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text('Update', style: TextStyle(fontSize: 13)),
+                ),
+              ),
+            ]),
+            const SizedBox(height: 12),
+            _card([
+              ListTile(
+                leading: const Icon(
+                  Icons.developer_board_rounded,
+                  color: Color(0xFF0F7B6C),
+                ),
                 title: const Text('ESP32 Alert Device'),
                 subtitle: const Text(
                   'Not paired',
@@ -144,18 +211,19 @@ class _VendorSettingsScreenState extends State<VendorSettingsScreen> {
             const SizedBox(height: 12),
             _card([
               ListTile(
-                leading: const Icon(Icons.logout,
-                    color: Color(0xFFE85A2B)),
-                title: const Text('Logout',
-                    style: TextStyle(color: Color(0xFFE85A2B))),
+                leading: const Icon(Icons.logout, color: Color(0xFFE85A2B)),
+                title: const Text(
+                  'Logout',
+                  style: TextStyle(color: Color(0xFFE85A2B)),
+                ),
                 onTap: () async {
                   await AuthService().logout();
                   if (!context.mounted) return;
                   Navigator.pushAndRemoveUntil(
                     context,
                     MaterialPageRoute(
-                        builder: (_) =>
-                            const RoleSelectionScreen()),
+                      builder: (_) => const RoleSelectionScreen(),
+                    ),
                     (route) => false,
                   );
                 },
@@ -177,13 +245,15 @@ class _VendorSettingsScreenState extends State<VendorSettingsScreen> {
     );
   }
 
-  Widget _switchTile(
-      String label, bool value, ValueChanged<bool> onChanged) {
+  Widget _switchTile(String label, bool value, ValueChanged<bool> onChanged) {
     return SwitchListTile(
-      title: Text(label,
-          style: const TextStyle(
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF2C2C2C))),
+      title: Text(
+        label,
+        style: const TextStyle(
+          fontWeight: FontWeight.w500,
+          color: Color(0xFF2C2C2C),
+        ),
+      ),
       value: value,
       onChanged: onChanged,
       activeThumbColor: const Color(0xFF0F7B6C),

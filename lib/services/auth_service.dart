@@ -4,6 +4,7 @@ import '../models/order_model.dart';
 import '../models/user_model.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'auth_error_handler.dart';
 
 class AuthService {
   // Firebase Auth instance — handles login/signup
@@ -56,6 +57,7 @@ class AuthService {
     required String name,
     required String email,
     required String phone,
+    String? flat,
     required String password,
     required String address,
   }) async {
@@ -78,6 +80,7 @@ class AuthService {
         name: name,
         email: email,
         phone: phone,
+        flat: flat,
         address: address,
         location: location,
         fcmToken: '',
@@ -89,8 +92,10 @@ class AuthService {
       // Save FCM token for push notifications
       await updateFcmToken(user.uid);
       return newUser;
+    } on FirebaseAuthException catch (e) {
+      throw AuthFailure(formatAuthError(e));
     } catch (e) {
-      rethrow;
+      throw AuthFailure(formatAuthError(e));
     }
   }
 
@@ -140,8 +145,10 @@ class AuthService {
       // Save FCM token for push notifications
       await updateFcmToken(user.uid);
       return newUser;
+    } on FirebaseAuthException catch (e) {
+      throw AuthFailure(formatAuthError(e));
     } catch (e) {
-      rethrow;
+      throw AuthFailure(formatAuthError(e));
     }
   }
 
@@ -177,8 +184,10 @@ class AuthService {
       await updateFcmToken(user.uid);
       return UserModel.fromMap(
           doc.data() as Map<String, dynamic>, user.uid);
+    } on FirebaseAuthException catch (e) {
+      throw AuthFailure(formatAuthError(e));
     } catch (e) {
-      rethrow;
+      throw AuthFailure(formatAuthError(e));
     }
   }
 
@@ -196,7 +205,7 @@ class AuthService {
       return UserModel.fromMap(
           doc.data() as Map<String, dynamic>, uid);
     } catch (e) {
-      rethrow;
+      throw AuthFailure(formatAuthError(e));
     }
   }
 }

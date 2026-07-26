@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import 'vendor_signup_screen.dart';
-import 'vendor_dashboard_screen.dart';
+import 'vendor_shell_screen.dart';
 
 class VendorLoginScreen extends StatefulWidget {
   const VendorLoginScreen({super.key});
@@ -36,7 +36,7 @@ class _VendorLoginScreenState extends State<VendorLoginScreen> {
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(
-        builder: (_) => VendorDashboardScreen(vendor: user),
+        builder: (_) => VendorShellScreen(vendor: user),
       ),
       (route) => false,
     );

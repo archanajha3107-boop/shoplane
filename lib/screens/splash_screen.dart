@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import 'role_selection_screen.dart';
-import 'customer/customer_home_screen.dart';
-import 'vendor/vendor_dashboard_screen.dart';
+import 'customer/customer_shell_screen.dart';
+import 'vendor/vendor_shell_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -36,9 +36,9 @@ class _SplashScreenState extends State<SplashScreen> {
       if (user == null) {
         _goTo(const RoleSelectionScreen());
       } else if (user.role == 'vendor') {
-        _goTo(VendorDashboardScreen(vendor: user));
+        _goTo(VendorShellScreen(vendor: user));
       } else {
-        _goTo(CustomerHomeScreen(customer: user));
+        _goTo(CustomerShellScreen(customer: user));
       }
     } catch (e) {
       if (!mounted) return;

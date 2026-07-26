@@ -22,8 +22,12 @@ class _VoiceProductScreenState extends State<VoiceProductScreen> {
   bool _saving = false;
 
   final List<String> _categories = [
-    'Groceries', 'Vegetables', 'Fruits',
-    'Dairy', 'Meat & Fish', 'Snacks'
+    'Groceries',
+    'Vegetables',
+    'Fruits',
+    'Dairy',
+    'Meat & Fish',
+    'Snacks',
   ];
 
   @override
@@ -54,8 +58,10 @@ class _VoiceProductScreenState extends State<VoiceProductScreen> {
             _parseSpokenText(_spokenText);
           }
         },
-        listenFor: const Duration(seconds: 10),
-        localeId: 'en_IN',
+        listenOptions: SpeechListenOptions(
+          listenFor: const Duration(seconds: 10),
+          localeId: 'en_IN',
+        ),
       );
     } else {
       setState(() => _isListening = false);
@@ -83,28 +89,36 @@ class _VoiceProductScreenState extends State<VoiceProductScreen> {
             .trim();
         // Capitalize first letter
         if (productName.isNotEmpty) {
-          productName =
-              productName[0].toUpperCase() + productName.substring(1);
+          productName = productName[0].toUpperCase() + productName.substring(1);
         }
       }
     }
 
     // Guess category from keywords
     String category = 'Groceries';
-    if (text.contains('tomato') || text.contains('potato') ||
-        text.contains('onion') || text.contains('carrot') ||
+    if (text.contains('tomato') ||
+        text.contains('potato') ||
+        text.contains('onion') ||
+        text.contains('carrot') ||
         text.contains('vegetable')) {
       category = 'Vegetables';
-    } else if (text.contains('apple') || text.contains('banana') ||
-        text.contains('mango') || text.contains('fruit')) {
+    } else if (text.contains('apple') ||
+        text.contains('banana') ||
+        text.contains('mango') ||
+        text.contains('fruit')) {
       category = 'Fruits';
-    } else if (text.contains('milk') || text.contains('curd') ||
-        text.contains('paneer') || text.contains('dairy')) {
+    } else if (text.contains('milk') ||
+        text.contains('curd') ||
+        text.contains('paneer') ||
+        text.contains('dairy')) {
       category = 'Dairy';
-    } else if (text.contains('chicken') || text.contains('fish') ||
-        text.contains('mutton') || text.contains('meat')) {
+    } else if (text.contains('chicken') ||
+        text.contains('fish') ||
+        text.contains('mutton') ||
+        text.contains('meat')) {
       category = 'Meat & Fish';
-    } else if (text.contains('biscuit') || text.contains('chips') ||
+    } else if (text.contains('biscuit') ||
+        text.contains('chips') ||
         text.contains('snack')) {
       category = 'Snacks';
     }
@@ -119,9 +133,7 @@ class _VoiceProductScreenState extends State<VoiceProductScreen> {
   Future<void> _saveProduct() async {
     if (_parsedName == null || _parsedPrice == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text(
-                'Could not parse product. Try again.')),
+        const SnackBar(content: Text('Could not parse product. Try again.')),
       );
       return;
     }
@@ -155,9 +167,9 @@ class _VoiceProductScreenState extends State<VoiceProductScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
       setState(() => _saving = false);
     }
   }
@@ -184,17 +196,23 @@ class _VoiceProductScreenState extends State<VoiceProductScreen> {
               ),
               child: const Column(
                 children: [
-                  Text('Say something like:',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F7B6C))),
+                  Text(
+                    'Say something like:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F7B6C),
+                    ),
+                  ),
                   SizedBox(height: 8),
-                  Text('"Tomatoes 40 rupees"',
-                      style: TextStyle(color: Color(0xFF2C2C2C))),
-                  Text('"Milk 60"',
-                      style: TextStyle(color: Color(0xFF2C2C2C))),
-                  Text('"Chicken 200 rupees"',
-                      style: TextStyle(color: Color(0xFF2C2C2C))),
+                  Text(
+                    '"Tomatoes 40 rupees"',
+                    style: TextStyle(color: Color(0xFF2C2C2C)),
+                  ),
+                  Text('"Milk 60"', style: TextStyle(color: Color(0xFF2C2C2C))),
+                  Text(
+                    '"Chicken 200 rupees"',
+                    style: TextStyle(color: Color(0xFF2C2C2C)),
+                  ),
                 ],
               ),
             ),
@@ -213,10 +231,11 @@ class _VoiceProductScreenState extends State<VoiceProductScreen> {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: (_isListening
-                              ? const Color(0xFFE85A2B)
-                              : const Color(0xFF0F7B6C))
-                          .withValues(alpha: 0.4),
+                      color:
+                          (_isListening
+                                  ? const Color(0xFFE85A2B)
+                                  : const Color(0xFF0F7B6C))
+                              .withValues(alpha: 0.4),
                       blurRadius: _isListening ? 20 : 10,
                       spreadRadius: _isListening ? 4 : 0,
                     ),
@@ -231,13 +250,9 @@ class _VoiceProductScreenState extends State<VoiceProductScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              _isListening
-                  ? 'Listening...'
-                  : 'Tap to speak',
+              _isListening ? 'Listening...' : 'Tap to speak',
               style: TextStyle(
-                color: _isListening
-                    ? const Color(0xFFE85A2B)
-                    : Colors.grey,
+                color: _isListening ? const Color(0xFFE85A2B) : Colors.grey,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -254,9 +269,10 @@ class _VoiceProductScreenState extends State<VoiceProductScreen> {
                 child: Text(
                   '"$_spokenText"',
                   style: const TextStyle(
-                      fontSize: 16,
-                      color: Color(0xFF2C2C2C),
-                      fontStyle: FontStyle.italic),
+                    fontSize: 16,
+                    color: Color(0xFF2C2C2C),
+                    fontStyle: FontStyle.italic,
+                  ),
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -270,61 +286,70 @@ class _VoiceProductScreenState extends State<VoiceProductScreen> {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                      color: const Color(0xFF0F7B6C), width: 1.5),
+                    color: const Color(0xFF0F7B6C),
+                    width: 1.5,
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Parsed:',
-                        style: TextStyle(
-                            color: Colors.grey, fontSize: 12)),
+                    const Text(
+                      'Parsed:',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        const Text('Product: ',
-                            style: TextStyle(
-                                color: Colors.grey, fontSize: 14)),
+                        const Text(
+                          'Product: ',
+                          style: TextStyle(color: Colors.grey, fontSize: 14),
+                        ),
                         Text(
                           _parsedName ?? 'Could not detect',
                           style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF2C2C2C),
-                              fontSize: 16),
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF2C2C2C),
+                            fontSize: 16,
+                          ),
                         ),
                       ],
                     ),
                     Row(
                       children: [
-                        const Text('Price: ',
-                            style: TextStyle(
-                                color: Colors.grey, fontSize: 14)),
+                        const Text(
+                          'Price: ',
+                          style: TextStyle(color: Colors.grey, fontSize: 14),
+                        ),
                         Text(
                           _parsedPrice != null
                               ? '₹${_parsedPrice!.toStringAsFixed(0)}'
                               : 'Could not detect',
                           style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF0F7B6C),
-                              fontSize: 16),
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F7B6C),
+                            fontSize: 16,
+                          ),
                         ),
                       ],
                     ),
                     Row(
                       children: [
-                        const Text('Category: ',
-                            style: TextStyle(
-                                color: Colors.grey, fontSize: 14)),
+                        const Text(
+                          'Category: ',
+                          style: TextStyle(color: Colors.grey, fontSize: 14),
+                        ),
                         DropdownButton<String>(
                           value: _parsedCategory,
                           underline: const SizedBox(),
                           style: const TextStyle(
-                              color: Color(0xFF2C2C2C),
-                              fontWeight: FontWeight.w600),
+                            color: Color(0xFF2C2C2C),
+                            fontWeight: FontWeight.w600,
+                          ),
                           items: _categories
-                              .map((c) => DropdownMenuItem(
-                                    value: c,
-                                    child: Text(c),
-                                  ))
+                              .map(
+                                (c) =>
+                                    DropdownMenuItem(value: c, child: Text(c)),
+                              )
                               .toList(),
                           onChanged: (v) =>
                               setState(() => _parsedCategory = v!),
@@ -342,10 +367,8 @@ class _VoiceProductScreenState extends State<VoiceProductScreen> {
                               _parsedPrice = null;
                             }),
                             style: OutlinedButton.styleFrom(
-                              foregroundColor:
-                                  const Color(0xFFE85A2B),
-                              side: const BorderSide(
-                                  color: Color(0xFFE85A2B)),
+                              foregroundColor: const Color(0xFFE85A2B),
+                              side: const BorderSide(color: Color(0xFFE85A2B)),
                             ),
                             child: const Text('Try Again'),
                           ),
@@ -355,8 +378,7 @@ class _VoiceProductScreenState extends State<VoiceProductScreen> {
                           child: ElevatedButton(
                             onPressed: _saving ? null : _saveProduct,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                                  const Color(0xFF0F7B6C),
+                              backgroundColor: const Color(0xFF0F7B6C),
                               foregroundColor: Colors.white,
                             ),
                             child: _saving
@@ -364,8 +386,10 @@ class _VoiceProductScreenState extends State<VoiceProductScreen> {
                                     height: 18,
                                     width: 18,
                                     child: CircularProgressIndicator(
-                                        color: Colors.white,
-                                        strokeWidth: 2))
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
                                 : const Text('Add Product'),
                           ),
                         ),

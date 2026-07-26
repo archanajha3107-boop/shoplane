@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import 'customer_login_screen.dart';
-import 'customer_home_screen.dart';
+import 'customer_shell_screen.dart';
 
 class CustomerSignupScreen extends StatefulWidget {
   const CustomerSignupScreen({super.key});
@@ -15,6 +15,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _flatController = TextEditingController();
   final _passwordController = TextEditingController();
   final _addressController = TextEditingController();
   final _authService = AuthService();
@@ -39,6 +40,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
     name: _nameController.text.trim(),
     email: _emailController.text.trim(),
     phone: _phoneController.text.trim(),
+    flat: _flatController.text.trim(),
     password: _passwordController.text,
     address: _addressController.text.trim(),
   );
@@ -47,7 +49,7 @@ class _CustomerSignupScreenState extends State<CustomerSignupScreen> {
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(
-        builder: (_) => CustomerHomeScreen(customer: customer),
+        builder: (_) => CustomerShellScreen(customer: customer),
       ),
       (route) => false,
     );
@@ -103,6 +105,9 @@ setState(() => _isLoading = false);
             const SizedBox(height: 16),
             _buildField('Phone Number', _phoneController, Icons.phone_outlined,
                 keyboardType: TextInputType.phone),
+            const SizedBox(height: 16),
+            _buildField('Flat / Tower (e.g. B-402)', _flatController,
+              Icons.apartment_outlined),
             const SizedBox(height: 16),
             _buildField('Address', _addressController, Icons.home_outlined),
             const SizedBox(height: 16),

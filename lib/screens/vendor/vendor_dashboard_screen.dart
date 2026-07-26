@@ -3,6 +3,7 @@ import '../../models/user_model.dart';
 import '../../models/order_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/firestore_service.dart';
+import '../../widgets/location_bottom_sheet.dart';
 import '../role_selection_screen.dart';
 import 'product_catalog_screen.dart';
 import 'vendor_settings_screen.dart';
@@ -24,6 +25,15 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
   void initState() {
     super.initState();
     _isOpen = widget.vendor.isOpen ?? false;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      LocationBottomSheet.showIfNeeded(context, (lat, lng, address) {
+        _loadVendors();
+      });
+    });
+  }
+
+  Future<void> _loadVendors() async {
+    if (mounted) setState(() {});
   }
 
   Future<void> _toggleShop(bool val) async {

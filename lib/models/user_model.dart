@@ -6,6 +6,7 @@ class UserModel {
   final String name;
   final String email;
   final String phone;
+  final String? flat;
   final GeoPoint? location;
   final String address;
   final String fcmToken;
@@ -30,6 +31,7 @@ class UserModel {
     required this.name,
     required this.email,
     required this.phone,
+    this.flat,
     this.location,
     required this.address,
     required this.fcmToken,
@@ -55,6 +57,7 @@ class UserModel {
       name: map['name'] ?? '',
       email: map['email'] ?? '',
       phone: map['phone'] ?? '',
+      flat: map['flat'],
       location: map['location'],
       address: map['address'] ?? '',
       fcmToken: map['fcmToken'] ?? '',
@@ -80,6 +83,7 @@ class UserModel {
       'name': name,
       'email': email,
       'phone': phone,
+      if (flat != null) 'flat': flat,
       'location': location,
       'address': address,
       'fcmToken': fcmToken,
