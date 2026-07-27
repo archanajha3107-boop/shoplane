@@ -20,8 +20,8 @@ class _CustomerShellScreenState extends State<CustomerShellScreen> {
   Widget build(BuildContext context) {
     final screens = [
       CustomerHomeScreen(user: widget.customer),
-      CategoryBrowseScreen(customer: widget.customer),
-      MyOrdersScreen(customerId: widget.customer.uid),
+      CategoryBrowseScreen(customer: widget.customer, embedded: true),
+      MyOrdersScreen(customerId: widget.customer.uid, embedded: true),
       CustomerProfileScreen(customer: widget.customer),
     ];
 

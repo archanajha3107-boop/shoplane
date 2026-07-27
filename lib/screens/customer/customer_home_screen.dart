@@ -53,9 +53,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF2F1EF),
-      body: CustomScrollView(
+    return CustomScrollView(
         slivers: [
           // Top bar — location + search
           SliverToBoxAdapter(
@@ -358,31 +356,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             },
           ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 100)),
+         const SliverToBoxAdapter(child: SizedBox(height: 100)),
         ],
-      ),
-      bottomNavigationBar: NavigationBar(
-        backgroundColor: Colors.white,
-        indicatorColor: const Color(0xFF0F7B6C).withValues(alpha: 0.1),
-        selectedIndex: 0,
-        destinations: const [
-          NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home_rounded,
-                  color: Color(0xFF0F7B6C)),
-              label: 'Home'),
-          NavigationDestination(
-              icon: Icon(Icons.receipt_long_outlined),
-              selectedIcon: Icon(Icons.receipt_long_rounded,
-                  color: Color(0xFF0F7B6C)),
-              label: 'Orders'),
-          NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person_rounded,
-                  color: Color(0xFF0F7B6C)),
-              label: 'Profile'),
-        ],
-      ),
     );
   }
 }

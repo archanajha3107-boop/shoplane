@@ -5,7 +5,8 @@ import '../../models/product_model.dart';
 
 class VoiceProductScreen extends StatefulWidget {
   final String vendorId;
-  const VoiceProductScreen({super.key, required this.vendorId});
+  final bool embedded;
+  const VoiceProductScreen({super.key, required this.vendorId, this.embedded = false});
 
   @override
   State<VoiceProductScreen> createState() => _VoiceProductScreenState();
@@ -36,11 +37,14 @@ class _VoiceProductScreenState extends State<VoiceProductScreen> {
     _initSpeech();
   }
 
-  Future<void> _initSpeech() async {
-    _speechAvailable = await _speech.initialize();
-    setState(() {});
-  }
-
+ Future<void> _initSpeech() async {
+  _speechAvailable = await _speech.initialize(
+    onError: (error) => debugPrint('SPEECH ERROR: ${error.errorMsg}'),
+    onStatus: (status) => debugPrint('SPEECH STATUS: $status'),
+  );
+  debugPrint('SPEECH AVAILABLE: $_speechAvailable');
+  setState(() {});
+}
   Future<void> _listen() async {
     if (!_isListening) {
       setState(() {
@@ -119,7 +123,11 @@ class _VoiceProductScreenState extends State<VoiceProductScreen> {
       category = 'Meat & Fish';
     } else if (text.contains('biscuit') ||
         text.contains('chips') ||
-        text.contains('snack')) {
+        text.contains('snack') ||
+        text.contains('sandwich') ||
+        text.contains('sandwhich') ||
+        text.contains('burger') ||
+        text.contains('roll')) {
       category = 'Snacks';
     }
 
@@ -176,16 +184,9 @@ class _VoiceProductScreenState extends State<VoiceProductScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF2F1EF),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0F7B6C),
-        foregroundColor: Colors.white,
-        title: const Text('Voice Add Product'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
+    final body = Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
           children: [
             // Instructions
             Container(
@@ -400,7 +401,43 @@ class _VoiceProductScreenState extends State<VoiceProductScreen> {
               ),
           ],
         ),
+    );
+    if (widget.embedded) {
+      return Container(
+        color: const Color(0xFFF2F1EF),
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                color: const Color(0xFF0F7B6C),
+                child: const Text(
+                  'Voice Add Product',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Expanded(child: body),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF2F1EF),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF0F7B6C),
+        foregroundColor: Colors.white,
+        title: const Text('Voice Add Product'),
       ),
+      body: body,
     );
   }
 }

@@ -20,9 +20,9 @@ class _VendorShellScreenState extends State<VendorShellScreen> {
   Widget build(BuildContext context) {
     final screens = [
       VendorDashboardScreen(vendor: widget.vendor),
-      ProductCatalogScreen(vendorId: widget.vendor.uid),
-      VoiceProductScreen(vendorId: widget.vendor.uid),
-      VendorSettingsScreen(vendor: widget.vendor),
+      ProductCatalogScreen(vendorId: widget.vendor.uid, embedded: true),
+      VoiceProductScreen(vendorId: widget.vendor.uid, embedded: true),
+      VendorSettingsScreen(vendor: widget.vendor, embedded: true),
     ];
 
     return Scaffold(

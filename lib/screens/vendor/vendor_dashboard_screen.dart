@@ -43,33 +43,45 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF2F1EF),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0F7B6C),
-        foregroundColor: Colors.white,
-        title: Text(widget.vendor.businessName ?? widget.vendor.name),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await AuthService().logout();
-              if (!context.mounted) return;
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const RoleSelectionScreen()),
-                (route) => false,
-              );
-            },
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return Container(
+      color: const Color(0xFFF2F1EF),
+      child: SafeArea(
+        bottom: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                margin: const EdgeInsets.only(bottom: 20),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        widget.vendor.businessName ?? widget.vendor.name,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF2C2C2C),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.logout, color: Color(0xFF2C2C2C)),
+                      onPressed: () async {
+                        await AuthService().logout();
+                        if (!context.mounted) return;
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const RoleSelectionScreen()),
+                          (route) => false,
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
             // Shop status card
             Container(
               padding: const EdgeInsets.all(20),
@@ -228,7 +240,8 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                 );
               },
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -8,7 +8,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class VendorSettingsScreen extends StatefulWidget {
   final UserModel vendor;
-  const VendorSettingsScreen({super.key, required this.vendor});
+  final bool embedded;
+  const VendorSettingsScreen({super.key, required this.vendor, this.embedded = false});
 
   @override
   State<VendorSettingsScreen> createState() => _VendorSettingsScreenState();
@@ -79,26 +80,7 @@ class _VendorSettingsScreenState extends State<VendorSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF2F1EF),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0F7B6C),
-        foregroundColor: Colors.white,
-        title: const Text('Settings'),
-        actions: [
-          TextButton(
-            onPressed: _saving ? null : _save,
-            child: const Text(
-              'Save',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
+    final content = SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
@@ -231,7 +213,71 @@ class _VendorSettingsScreenState extends State<VendorSettingsScreen> {
             ]),
           ],
         ),
+      );
+
+    if (widget.embedded) {
+      return Container(
+        color: const Color(0xFFF2F1EF),
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                color: const Color(0xFF0F7B6C),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Settings',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _saving ? null : _save,
+                      child: const Text(
+                        'Save',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(child: content),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF2F1EF),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF0F7B6C),
+        foregroundColor: Colors.white,
+        title: const Text('Settings'),
+        actions: [
+          TextButton(
+            onPressed: _saving ? null : _save,
+            child: const Text(
+              'Save',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
       ),
+      body: content,
     );
   }
 
