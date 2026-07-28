@@ -14,6 +14,8 @@ class VendorMatchResultsScreen extends StatefulWidget {
 
 class _VendorMatchResultsScreenState extends State<VendorMatchResultsScreen> {
   List<VendorMatch> _matches = [];
+  List<VendorMatch> _fullMatch = [];
+  List<VendorMatch> _splitPlan = [];
   bool _loading = true;
 
   @override
@@ -30,7 +32,15 @@ class _VendorMatchResultsScreenState extends State<VendorMatchResultsScreen> {
       customerLat: lat,
       customerLng: lng,
     );
-    if (mounted) setState(() { _matches = results; _loading = false; });
+    final fullMatch = results.where((m) => m.matchedItemCount == m.totalCartItems).toList();
+    final splitPlan = fullMatch.isEmpty
+    ? VendorMatchingService().greedySetCover(results, widget.wishlist)
+    : <VendorMatch>[];    if (mounted) setState(() {
+      _matches = results;
+      _fullMatch = fullMatch;
+      _splitPlan = splitPlan;
+      _loading = false;
+    });
   }
 
   @override
@@ -48,9 +58,38 @@ class _VendorMatchResultsScreenState extends State<VendorMatchResultsScreen> {
               ? const Center(child: Text('No nearby shops have these items', style: TextStyle(color: Colors.grey)))
               : ListView.builder(
                   padding: const EdgeInsets.all(16),
-                  itemCount: _matches.length,
+                  itemCount: _matches.length + (_fullMatch.isEmpty && _splitPlan.isNotEmpty ? 1 : 0),
                   itemBuilder: (context, i) {
-                    final m = _matches[i];
+                    if (_fullMatch.isEmpty && _splitPlan.isNotEmpty && i == 0) {
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFC9A227).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'No single shop has everything — smart split suggested:',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFC9A227),
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            ..._splitPlan.map((m) => Text(
+                                  '• ${m.vendor.businessName ?? m.vendor.name} — ${m.matchedItemCount} items',
+                                  style: const TextStyle(fontSize: 12, color: Color(0xFF2C2C2C)),
+                                )),
+                          ],
+                        ),
+                      );
+                    }
+                    final matchIndex = _fullMatch.isEmpty && _splitPlan.isNotEmpty ? i - 1 : i;
+                    final m = _matches[matchIndex];
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(16),

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:math';
 import '../models/user_model.dart';
 import '../models/product_model.dart';
+import '../utils/fuzzy_match.dart';
 
 class VendorMatch {
   final UserModel vendor;
@@ -33,15 +34,14 @@ class VendorMatchingService {
     return R * 2 * atan2(sqrt(a), sqrt(1 - a));
   }
 
-  /// Given a wishlist of product names, find nearby vendors ranked by
-  /// how many items they can fulfill, then by distance.
+  /// Given a wishlist of product names, find nearby open vendors ranked by
+  /// how many items they can fulfill (using fuzzy matching), then by distance.
   Future<List<VendorMatch>> matchVendors({
     required List<String> wishlistNames,
     required double customerLat,
     required double customerLng,
     double radiusKm = 5,
   }) async {
-    // 1. Get all open vendors within radius
     final vendorSnap = await _db.collection('users')
         .where('role', isEqualTo: 'vendor')
         .where('isOpen', isEqualTo: true)
@@ -56,7 +56,6 @@ class VendorMatchingService {
 
     if (vendors.isEmpty) return [];
 
-    // 2. For each vendor, fetch their in-stock products and count matches
     final List<VendorMatch> matches = [];
     for (final vendor in vendors) {
       final productSnap = await _db.collection('products')
@@ -70,13 +69,11 @@ class VendorMatchingService {
 
       final matched = <ProductModel>[];
       for (final wishItem in wishlistNames) {
-        final hit = products.where((p) =>
-            p.name.toLowerCase().contains(wishItem.toLowerCase()) ||
-            wishItem.toLowerCase().contains(p.name.toLowerCase()));
+        final hit = products.where((p) => isFuzzyMatch(p.name, wishItem));
         if (hit.isNotEmpty) matched.add(hit.first);
       }
 
-      if (matched.isEmpty) continue; // skip vendors with zero matches
+      if (matched.isEmpty) continue;
 
       final dist = _haversine(customerLat, customerLng,
           vendor.location!.latitude, vendor.location!.longitude);
@@ -90,7 +87,6 @@ class VendorMatchingService {
       ));
     }
 
-    // 3. Rank: highest match % first, then closest distance
     matches.sort((a, b) {
       final scoreCompare = b.matchScore.compareTo(a.matchScore);
       if (scoreCompare != 0) return scoreCompare;
@@ -98,5 +94,33 @@ class VendorMatchingService {
     });
 
     return matches;
+  }
+
+  /// Greedy Set Cover approximation — used only as a documented, designed
+  /// concept for now. NOT wired into tomorrow's demo flow. Queued for the
+  /// sprint after the pilot, once single-vendor matching is proven stable.
+  List<VendorMatch> greedySetCover(List<VendorMatch> allMatches, List<String> wishlist) {
+    final Set<String> uncovered = wishlist.map((e) => e.toLowerCase()).toSet();
+    final List<VendorMatch> chosen = [];
+    final remaining = List<VendorMatch>.from(allMatches);
+
+    while (uncovered.isNotEmpty && remaining.isNotEmpty) {
+      remaining.sort((a, b) {
+        final aCover = a.matchedProducts.where((p) => uncovered.any((u) => isFuzzyMatch(p.name, u))).length;
+        final bCover = b.matchedProducts.where((p) => uncovered.any((u) => isFuzzyMatch(p.name, u))).length;
+        return bCover.compareTo(aCover);
+      });
+
+      final best = remaining.first;
+      final coveredByBest = best.matchedProducts.where((p) => uncovered.any((u) => isFuzzyMatch(p.name, u))).toList();
+      if (coveredByBest.isEmpty) break;
+
+      chosen.add(best);
+      for (final p in coveredByBest) {
+        uncovered.removeWhere((u) => isFuzzyMatch(p.name, u));
+      }
+      remaining.remove(best);
+    }
+    return chosen;
   }
 }

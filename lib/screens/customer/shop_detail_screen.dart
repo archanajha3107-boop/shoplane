@@ -4,6 +4,7 @@ import '../../models/product_model.dart';
 import '../../models/order_model.dart';
 import '../../services/firestore_service.dart';
 import 'cart_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ShopDetailScreen extends StatefulWidget {
   final UserModel vendor;
@@ -342,6 +343,22 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                     ),
                     child: const Text('View Cart'),
                   ),
+                  IconButton(
+  icon: const Icon(Icons.person_add_alt_1_rounded),
+  onPressed: () async {
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.customer.uid)
+        .collection('myShops')
+        .doc(widget.vendor.uid)
+        .set({'savedAt': FieldValue.serverTimestamp()});
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Added to Uncle shops!'), backgroundColor: Color(0xFF0F7B6C)),
+      );
+    }
+  },
+),
                 ],
               ),
             ),

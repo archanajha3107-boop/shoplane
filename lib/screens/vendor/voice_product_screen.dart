@@ -12,8 +12,10 @@ class VoiceProductScreen extends StatefulWidget {
   State<VoiceProductScreen> createState() => _VoiceProductScreenState();
 }
 
-class _VoiceProductScreenState extends State<VoiceProductScreen> {
+class _VoiceProductScreenState extends State<VoiceProductScreen>
+    with SingleTickerProviderStateMixin {
   final SpeechToText _speech = SpeechToText();
+  late AnimationController _pulseController;
   bool _isListening = false;
   bool _speechAvailable = false;
   String _spokenText = '';
@@ -34,17 +36,29 @@ class _VoiceProductScreenState extends State<VoiceProductScreen> {
   @override
   void initState() {
     super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+      lowerBound: 0.8,
+      upperBound: 1.4,
+    )..addStatusListener((status) {
+        if (status == AnimationStatus.completed) {
+          _pulseController.reverse();
+        } else if (status == AnimationStatus.dismissed) {
+          _pulseController.forward();
+        }
+      });
     _initSpeech();
   }
 
- Future<void> _initSpeech() async {
-  _speechAvailable = await _speech.initialize(
-    onError: (error) => debugPrint('SPEECH ERROR: ${error.errorMsg}'),
-    onStatus: (status) => debugPrint('SPEECH STATUS: $status'),
-  );
-  debugPrint('SPEECH AVAILABLE: $_speechAvailable');
-  setState(() {});
-}
+  Future<void> _initSpeech() async {
+    _speechAvailable = await _speech.initialize(
+      onError: (error) => debugPrint('SPEECH ERROR: ${error.errorMsg}'),
+      onStatus: (status) => debugPrint('SPEECH STATUS: $status'),
+    );
+    debugPrint('SPEECH AVAILABLE: $_speechAvailable');
+    setState(() {});
+  }
   Future<void> _listen() async {
     if (!_isListening) {
       setState(() {
@@ -53,6 +67,7 @@ class _VoiceProductScreenState extends State<VoiceProductScreen> {
         _parsedName = null;
         _parsedPrice = null;
       });
+      _pulseController.forward();
       await _speech.listen(
         onResult: (result) {
           setState(() {
@@ -69,6 +84,7 @@ class _VoiceProductScreenState extends State<VoiceProductScreen> {
       );
     } else {
       setState(() => _isListening = false);
+      _pulseController.stop();
       await _speech.stop();
     }
   }
@@ -183,6 +199,13 @@ class _VoiceProductScreenState extends State<VoiceProductScreen> {
   }
 
   @override
+  void dispose() {
+    _pulseController.dispose();
+    _speech.stop();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final body = Padding(
       padding: const EdgeInsets.all(24),
@@ -221,32 +244,60 @@ class _VoiceProductScreenState extends State<VoiceProductScreen> {
             // Mic button
             GestureDetector(
               onTap: _speechAvailable ? _listen : null,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: _isListening ? 100 : 80,
-                height: _isListening ? 100 : 80,
-                decoration: BoxDecoration(
-                  color: _isListening
-                      ? const Color(0xFFE85A2B)
-                      : const Color(0xFF0F7B6C),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color:
-                          (_isListening
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  if (_isListening)
+                    AnimatedBuilder(
+                      animation: _pulseController,
+                      builder: (context, child) {
+                        final value = _pulseController.value;
+                        return Transform.scale(
+                          scale: value,
+                          child: Opacity(
+                            opacity: (1.4 - value) / 0.6,
+                            child: Container(
+                              width: 100,
+                              height: 100,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: const Color(0xFFE85A2B),
+                                  width: 2,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: _isListening ? 100 : 80,
+                    height: _isListening ? 100 : 80,
+                    decoration: BoxDecoration(
+                      color: _isListening
+                          ? const Color(0xFFE85A2B)
+                          : const Color(0xFF0F7B6C),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: (_isListening
                                   ? const Color(0xFFE85A2B)
                                   : const Color(0xFF0F7B6C))
                               .withValues(alpha: 0.4),
-                      blurRadius: _isListening ? 20 : 10,
-                      spreadRadius: _isListening ? 4 : 0,
+                          blurRadius: _isListening ? 20 : 10,
+                          spreadRadius: _isListening ? 4 : 0,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: Icon(
-                  _isListening ? Icons.mic : Icons.mic_none,
-                  color: Colors.white,
-                  size: 36,
-                ),
+                    child: Icon(
+                      _isListening ? Icons.mic : Icons.mic_none,
+                      color: Colors.white,
+                      size: 36,
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 12),

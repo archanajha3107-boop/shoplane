@@ -227,14 +227,20 @@ class _VendorDashboardScreenState extends State<VendorDashboardScreen> {
                 }
                 return Column(
                   children: active
-                      .map((order) => _OrderCard(
-                            order: order,
-                            onAccept: () => _fs.updateOrderStatus(
-                                order.id, 'accepted'),
-                            onReject: () => _fs.updateOrderStatus(
-                                order.id, 'rejected'),
-                            onDispatched: () => _fs.updateOrderStatus(
-                                order.id, 'dispatched'),
+                      .map((order) => TweenAnimationBuilder<double>(
+                            tween: Tween(begin: 0, end: 1),
+                            duration: const Duration(milliseconds: 400),
+                            curve: Curves.easeOutCubic,
+                            builder: (context, value, child) => Transform.translate(
+                              offset: Offset(0, (1 - value) * 30),
+                              child: Opacity(opacity: value, child: child),
+                            ),
+                            child: _OrderCard(
+                              order: order,
+                              onAccept: () => _fs.updateOrderStatus(order.id, 'accepted'),
+                              onReject: () => _fs.updateOrderStatus(order.id, 'rejected'),
+                              onDispatched: () => _fs.updateOrderStatus(order.id, 'dispatched'),
+                            ),
                           ))
                       .toList(),
                 );

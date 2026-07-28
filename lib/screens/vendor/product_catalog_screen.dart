@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/product_model.dart';
 import '../../services/firestore_service.dart';
 import 'add_product_screen.dart';
+import 'product_search_screen.dart';
 import 'voice_product_screen.dart';
 
 class ProductCatalogScreen extends StatelessWidget {
@@ -155,6 +156,17 @@ class ProductCatalogScreen extends StatelessWidget {
         backgroundColor: const Color(0xFF0F7B6C),
         foregroundColor: Colors.white,
         title: const Text('My Products'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ProductSearchScreen(vendorId: vendorId),
+              ),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: actionButtons,
       body: content,

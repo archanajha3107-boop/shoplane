@@ -228,3 +228,61 @@ class OrderTrackingScreen extends StatelessWidget {
     );
   }
 }
+class _AnimatedStatusDot extends StatefulWidget {
+  final bool completed;
+  final bool isCurrent;
+  const _AnimatedStatusDot({required this.completed, required this.isCurrent});
+
+  @override
+  State<_AnimatedStatusDot> createState() => _AnimatedStatusDotState();
+}
+
+class _AnimatedStatusDotState extends State<_AnimatedStatusDot> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 600))
+      ..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.isCurrent) {
+      return Container(
+        width: 24, height: 24,
+        decoration: BoxDecoration(
+          color: widget.completed ? const Color(0xFF0F7B6C) : Colors.transparent,
+          border: Border.all(color: widget.completed ? const Color(0xFF0F7B6C) : Colors.grey.shade300, width: 2),
+          shape: BoxShape.circle,
+        ),
+        child: widget.completed ? const Icon(Icons.check, color: Colors.white, size: 14) : null,
+      );
+    }
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) => Container(
+        width: 24, height: 24,
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F7B6C).withValues(alpha: 0.4 + (_controller.value * 0.6)),
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF0F7B6C).withValues(alpha: 0.3 * _controller.value),
+              blurRadius: 8 * _controller.value,
+              spreadRadius: 3 * _controller.value,
+            ),
+          ],
+        ),
+        child: const Icon(Icons.check, color: Colors.white, size: 14),
+      ),
+    );
+  }
+}

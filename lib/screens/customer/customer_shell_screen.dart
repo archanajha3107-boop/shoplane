@@ -21,6 +21,7 @@ class _CustomerShellScreenState extends State<CustomerShellScreen> {
     final screens = [
       CustomerHomeScreen(user: widget.customer),
       CategoryBrowseScreen(customer: widget.customer, embedded: true),
+      UncleScreen(customer: widget.customer),
       MyOrdersScreen(customerId: widget.customer.uid, embedded: true),
       CustomerProfileScreen(customer: widget.customer),
     ];
@@ -30,6 +31,7 @@ class _CustomerShellScreenState extends State<CustomerShellScreen> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
+        animationDuration: const Duration(milliseconds: 400),
         backgroundColor: Colors.white,
         indicatorColor: const Color(0xFF0F7B6C).withValues(alpha: 0.12),
         destinations: const [

@@ -30,6 +30,7 @@ class _VendorShellScreenState extends State<VendorShellScreen> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
+        animationDuration: const Duration(milliseconds: 400),
         backgroundColor: Colors.white,
         indicatorColor: const Color(0xFFE85A2B).withValues(alpha: 0.12),
         destinations: const [
