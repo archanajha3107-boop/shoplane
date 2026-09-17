@@ -1,5 +1,7 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/user_model.dart';
+import '../../services/vendor_matcher.dart'; // Make sure this is imported
 import 'vendor_match_results_screen.dart';
 
 class CategoryBrowseScreen extends StatefulWidget {
@@ -125,15 +127,59 @@ class _CategoryBrowseScreenState extends State<CategoryBrowseScreen> {
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => VendorMatchResultsScreen(
-                        customer: widget.customer,
-                        wishlist: _wishlist.toList(),
-                      ),
-                    ),
-                  ),
+                  onPressed: () async {
+                    // 1. Show loading progress indicator while calculating matches
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (_) => const Center(child: CircularProgressIndicator()),
+                    );
+
+                    try {
+                      // 2. Fetch active vendors from Firebase
+                      final vendorsSnapshot = await FirebaseFirestore.instance
+                          .collection('users')
+                          .where('role', isEqualTo: 'vendor')
+                          .get();
+                          
+                      final nearbyVendors = vendorsSnapshot.docs
+                          .map((doc) => UserModel.fromMap(doc.data(), doc.id))
+                          .toList();
+
+                      // 3. Compute matching result using the Set Cover algorithm
+                      final matchResult = await findVendorsForList(
+                        _wishlist.toList(),
+                        nearbyVendors,
+                      );
+
+                      // Dismiss loading dialog
+                      if (context.mounted) Navigator.pop(context);
+
+                      // 4. Navigate to results screen passing ALL required arguments
+                      if (context.mounted) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => VendorMatchResultsScreen(
+                              matchResult: matchResult, // Fixed: Required parameter added
+                              customer: widget.customer,
+                              wishlist: _wishlist.toList(),
+                            ),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      // Dismiss loading dialog on error
+                      if (context.mounted) Navigator.pop(context);
+                      
+                      // Show snackbar feedback
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error finding shops: $e')),
+                        );
+                      }
+                    }
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFE85A2B),
                     foregroundColor: Colors.white,

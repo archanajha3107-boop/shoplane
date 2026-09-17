@@ -10,9 +10,9 @@ class CustomerProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFFF2F1EF),
-      child: SafeArea(
+    return Scaffold(                          // <-- ADDED
+      backgroundColor: const Color(0xFFF2F1EF),
+      body: SafeArea(
         bottom: false,
         child: SingleChildScrollView(
           child: Column(

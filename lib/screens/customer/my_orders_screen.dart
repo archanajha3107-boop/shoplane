@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/order_model.dart';
+import '../../constants/app_colors.dart';
 import '../../services/firestore_service.dart';
 import 'order_tracking_screen.dart';
 
@@ -10,14 +11,21 @@ class MyOrdersScreen extends StatelessWidget {
 
   Color _statusColor(String status) {
     switch (status) {
-      case 'new': return const Color(0xFFE85A2B);
-      case 'accepted': return const Color(0xFF0F7B6C);
-      case 'dispatched': return const Color(0xFFC9A227);
-      case 'delivered': return Colors.grey;
-      case 'rejected': return Colors.red;
-      default: return Colors.grey;
+      case 'new':
+        return AppColors.statusNew;
+      case 'accepted':
+        return AppColors.statusAccepted;
+      case 'dispatched':
+        return AppColors.statusDispatched;
+      case 'delivered':
+        return AppColors.statusDelivered;
+      case 'rejected':
+        return AppColors.statusRejected;
+      default:
+        return Colors.grey;
     }
   }
+
 
   @override
   Widget build(BuildContext context) {

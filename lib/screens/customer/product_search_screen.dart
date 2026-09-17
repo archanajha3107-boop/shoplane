@@ -1,10 +1,20 @@
+// product_search_screen.dart
+// Vendor-side: search Open Food Facts, capture the REAL packet quantity
+// (locked, non-editable — prevents a vendor mispricing a 500ml pack as 1L),
+// real images, description, self-reported MRP.
+// Writes to the TOP-LEVEL 'products' collection with a 'sellerId' field —
+// this matches your real FirestoreService.vendorProducts()/shopProducts()
+// queries. If products still aren't showing up in your shop after this,
+// check Firestore Console under 'products' (not 'vendors/{id}/products').
+
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import '../../services/product_lookup_service.dart';
+import 'package:http/http.dart' as http;
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProductSearchScreen extends StatefulWidget {
-  final Function(String productName, String category) onAddToWishlist;
-  const ProductSearchScreen({super.key, required this.onAddToWishlist});
+  final String vendorId;
+  const ProductSearchScreen({super.key, required this.vendorId});
 
   @override
   State<ProductSearchScreen> createState() => _ProductSearchScreenState();
@@ -12,112 +22,200 @@ class ProductSearchScreen extends StatefulWidget {
 
 class _ProductSearchScreenState extends State<ProductSearchScreen> {
   final _controller = TextEditingController();
-  List<RemoteProduct> _results = [];
+  List<dynamic> _results = [];
   bool _loading = false;
-  final Set<String> _added = {};
+  String? _error;
 
   Future<void> _search(String query) async {
-    setState(() => _loading = true);
-    final results = await ProductLookupService().search(query);
-    if (mounted) setState(() { _results = results; _loading = false; });
+    if (query.trim().isEmpty) return;
+    setState(() { _loading = true; _error = null; });
+
+    try {
+      final uri = Uri.parse(
+        'https://world.openfoodfacts.org/cgi/search.pl'
+        '?search_terms=${Uri.encodeComponent(query)}'
+        '&search_simple=1&json=1&page_size=15');
+      final response = await http.get(uri);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() { _results = data['products'] ?? []; _loading = false; });
+      } else {
+        setState(() { _error = 'Search failed (${response.statusCode}).'; _loading = false; });
+      }
+    } catch (e) {
+      setState(() { _error = 'Something went wrong: $e'; _loading = false; });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF2F1EF),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF0F7B6C),
-        foregroundColor: Colors.white,
-        title: const Text('Search Products'),
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _controller,
-              onSubmitted: _search,
-              decoration: InputDecoration(
-                hintText: 'Search e.g. Kurkure, Amul Milk...',
-                prefixIcon: const Icon(Icons.search, color: Color(0xFF0F7B6C)),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.arrow_forward, color: Color(0xFFE85A2B)),
-                  onPressed: () => _search(_controller.text),
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: TextField(
+            controller: _controller,
+            textInputAction: TextInputAction.search,
+            decoration: InputDecoration(
+              hintText: 'e.g. Kurkure, Amul Butter, Parle-G',
+              prefixIcon: const Icon(Icons.search),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              suffixIcon: IconButton(icon: const Icon(Icons.arrow_forward), onPressed: () => _search(_controller.text)),
+            ),
+            onSubmitted: _search,
+          ),
+        ),
+        if (_loading) const Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()),
+        if (_error != null) Padding(padding: const EdgeInsets.all(16), child: Text(_error!, style: const TextStyle(color: Colors.red))),
+        Expanded(
+          child: ListView.builder(
+            itemCount: _results.length,
+            itemBuilder: (context, i) {
+              final product = _results[i];
+              final name = (product['product_name'] as String?)?.trim() ?? '';
+              final brand = (product['brands'] as String?)?.trim() ?? '';
+              final frontImage = (product['image_front_url'] as String?) ?? (product['image_url'] as String?) ?? '';
+              final thumbImage = (product['image_front_small_url'] as String?) ?? frontImage;
+              final ingredientsImage = (product['image_ingredients_url'] as String?) ?? '';
+              final genericName = (product['generic_name'] as String?)?.trim() ?? '';
+              final categories = (product['categories'] as String?)?.trim() ?? '';
+              // THIS is the real packet size printed on the product — "1 L", "500 g", "68 g" etc.
+              final quantity = (product['quantity'] as String?)?.trim() ?? '';
+
+              if (name.isEmpty) return const SizedBox.shrink();
+
+              return ListTile(
+                leading: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: thumbImage.isNotEmpty
+                      ? Image.network(thumbImage, width: 44, height: 44, fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(width: 44, height: 44, color: Colors.grey[200]))
+                      : Container(width: 44, height: 44, color: Colors.grey[200]),
                 ),
-                filled: true, fillColor: Colors.white,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-              ),
+                title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                subtitle: Text(
+                  [brand, quantity].where((s) => s.isNotEmpty).join(' • '),
+                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                ),
+                trailing: const Icon(Icons.add_circle_outline),
+                onTap: () => _showAddProductDialog(
+                  context, name,
+                  images: [frontImage, ingredientsImage].where((u) => u.isNotEmpty).toList(),
+                  description: genericName.isNotEmpty ? genericName : categories,
+                  quantity: quantity,
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showAddProductDialog(BuildContext context, String name,
+      {required List<String> images, required String description, required String quantity}) {
+    final priceController = TextEditingController();
+    final mrpController = TextEditingController();
+    String? errorText;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text('Add "$name"'),
+          content: SingleChildScrollView( // FIX: dialog content was overflowing when the MRP error message appeared
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+              // Quantity is shown but LOCKED — this is exactly what's printed
+              // on the real packet per Open Food Facts, a vendor can't edit
+              // it to misrepresent pack size (e.g. listing 500ml as 1L).
+              if (quantity.isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(8)),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.inventory_2_outlined, size: 18, color: Colors.grey),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text('Pack size: $quantity', style: const TextStyle(fontWeight: FontWeight.w600))),
+                      const Icon(Icons.lock_outline, size: 14, color: Colors.grey),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ] else ...[
+                const Text('⚠️ Pack size not available from database — double-check the packet before listing.',
+                    style: TextStyle(color: Colors.orange, fontSize: 12)),
+                const SizedBox(height: 12),
+              ],
+              TextField(controller: priceController, keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                autofocus: true, decoration: const InputDecoration(labelText: 'Your Selling Price', prefixText: '₹', hintText: 'e.g. 20')),
+              const SizedBox(height: 12),
+              TextField(controller: mrpController, keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'MRP (optional)', prefixText: '₹', hintText: 'Check the packet')),
+                if (errorText != null) ...[const SizedBox(height: 8), Text(errorText!, style: const TextStyle(color: Colors.red, fontSize: 13))],
+              ],
             ),
           ),
-          if (_loading) const CircularProgressIndicator(color: Color(0xFF0F7B6C)),
-          Expanded(
-            child: _results.isEmpty && !_loading
-                ? const Center(child: Text('Search for a product to add to your list', style: TextStyle(color: Colors.grey)))
-                : GridView.builder(
-                    padding: const EdgeInsets.all(16),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 0.75,
-                    ),
-                    itemCount: _results.length,
-                    itemBuilder: (context, i) {
-                      final p = _results[i];
-                      final added = _added.contains(p.name);
-                      return Container(
-                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-                        padding: const EdgeInsets.all(10),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: p.imageUrl.isNotEmpty
-                                    ? CachedNetworkImage(
-                                        imageUrl: p.imageUrl,
-                                        fit: BoxFit.contain,
-                                        placeholder: (c, u) => Container(color: Colors.grey.shade100),
-                                        errorWidget: (c, u, e) => Container(
-                                          color: Colors.grey.shade100,
-                                          child: const Icon(Icons.image_not_supported_outlined, color: Colors.grey),
-                                        ),
-                                      )
-                                    : Container(
-                                        color: Colors.grey.shade100,
-                                        child: const Icon(Icons.shopping_bag_outlined, color: Colors.grey),
-                                      ),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF2C2C2C))),
-                            Text(p.brand, maxLines: 1, overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 10, color: Colors.grey)),
-                            const SizedBox(height: 6),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: added ? null : () {
-                                  widget.onAddToWishlist(p.name, p.category);
-                                  setState(() => _added.add(p.name));
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: added ? Colors.grey.shade300 : const Color(0xFFE85A2B),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 6),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                ),
-                                child: Text(added ? 'Added ✓' : 'Add', style: const TextStyle(fontSize: 11)),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-          ),
-        ],
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                final sellingPrice = double.tryParse(priceController.text);
+                final mrp = mrpController.text.trim().isEmpty ? null : double.tryParse(mrpController.text);
+
+                if (sellingPrice == null || sellingPrice <= 0) {
+                  setDialogState(() => errorText = 'Enter a valid selling price');
+                  return;
+                }
+                if (mrp != null && sellingPrice > mrp) {
+                  setDialogState(() => errorText = 'Selling price cannot exceed MRP (₹${mrp.toStringAsFixed(0)})');
+                  return;
+                }
+
+                // Top-level 'products' collection, sellerId field — matches
+                // your real FirestoreService queries. NOT vendors/{id}/products.
+                await FirebaseFirestore.instance.collection('products').add({
+                  // Required by your real ProductModel schema — missing these
+                  // is why packaged items saved but never appeared in My Products.
+                  'sellerId': widget.vendorId,
+                  'name': name,
+                  'price': sellingPrice,
+                  'category': 'Grocery & Provisions',
+                  'inStock': true,
+                  'isVariableStock': false,
+                  'lastUpdated': FieldValue.serverTimestamp(),
+                  'photoUrl': images.isNotEmpty ? images.first : '',
+                  // Extra fields on top of the base schema — safe, ignored by fromMap.
+                  'nameLower': name.toLowerCase(),
+                  if (mrp != null) 'mrp': mrp,
+                  if (quantity.isNotEmpty) 'netQuantity': quantity,
+                  'imageUrls': images,
+                  'description': description,
+                  'source': 'openFoodFacts',
+                  'createdAt': FieldValue.serverTimestamp(),
+                });
+
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$name added to your shop')));
+                  setState(() { _controller.clear(); _results = []; });
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 }

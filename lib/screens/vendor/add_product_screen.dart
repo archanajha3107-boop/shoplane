@@ -1,6 +1,16 @@
+// add_product_screen.dart
+// Vendor-side: single entry point for adding a product.
+// Tab 1 = Common Items (EXPANDED seed list, ~100+ items — Bug #5 fix — + "Add Custom Item")
+// Tab 2 = Search Packaged (Open Food Facts)
+// Supports: image (Camera/Gallery/Emoji), unit-of-measure field (Bug #6 fix),
+// optional quality/variant labels for multi-tier pricing.
+
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
-import '../../models/product_model.dart';
-import '../../services/firestore_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
+import 'product_search_screen.dart';
 
 class AddProductScreen extends StatefulWidget {
   final String vendorId;
@@ -10,180 +20,289 @@ class AddProductScreen extends StatefulWidget {
   State<AddProductScreen> createState() => _AddProductScreenState();
 }
 
-class _AddProductScreenState extends State<AddProductScreen> {
-  final _nameController = TextEditingController();
-  final _priceController = TextEditingController();
-  String _category = 'Groceries';
-  bool _inStock = true;
-  bool _isVariableStock = false;
-  bool _isLoading = false;
+class _AddProductScreenState extends State<AddProductScreen> with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
 
-  final List<String> _categories = [
-    'Groceries', 'Vegetables', 'Fruits',
-    'Dairy', 'Meat & Fish', 'Snacks'
+  // EXPANDED — Bug #5: was 7/6/5/4/4 items, now genuinely wide-range per category.
+  static const Map<String, List<String>> _seedCatalogue = {
+    'Vegetables & Fruits': [
+      'Tomatoes', 'Onions', 'Potatoes', 'Bananas', 'Apples', 'Spinach', 'Carrots',
+      'Cauliflower', 'Cabbage', 'Brinjal', 'Ladyfinger (Bhindi)', 'Green Chilli',
+      'Ginger', 'Garlic', 'Capsicum', 'Cucumber', 'Beetroot', 'Peas', 'French Beans',
+      'Bottle Gourd (Lauki)', 'Ridge Gourd (Turai)', 'Bitter Gourd (Karela)',
+      'Pumpkin', 'Radish', 'Coriander Leaves', 'Mint Leaves', 'Curry Leaves',
+      'Fenugreek (Methi)', 'Mango', 'Papaya', 'Watermelon', 'Muskmelon', 'Grapes',
+      'Pomegranate', 'Orange', 'Sweet Lime (Mosambi)', 'Guava', 'Pineapple',
+      'Chikoo', 'Custard Apple', 'Lemon', 'Coconut', 'Sweet Potato', 'Corn',
+      'Drumstick', 'Raw Banana', 'Ash Gourd', 'Colocasia (Arbi)',
+    ],
+    'Grocery & Provisions': [
+      'Rice (Basmati)', 'Rice (Sona Masoori)', 'Wheat Flour (Atta)', 'Toor Dal',
+      'Moong Dal', 'Chana Dal', 'Urad Dal', 'Masoor Dal', 'Rajma', 'Chana (Kabuli)',
+      'Sugar', 'Jaggery (Gud)', 'Cooking Oil (Sunflower)', 'Cooking Oil (Groundnut)',
+      'Mustard Oil', 'Salt', 'Besan (Gram Flour)', 'Maida', 'Suji (Rava)',
+      'Poha', 'Vermicelli', 'Tea Leaves', 'Coffee Powder', 'Turmeric Powder',
+      'Red Chilli Powder', 'Coriander Powder', 'Cumin Seeds', 'Mustard Seeds',
+      'Garam Masala', 'Black Pepper', 'Cloves', 'Cardamom', 'Cinnamon',
+      'Bay Leaf', 'Asafoetida (Hing)', 'Tamarind', 'Papad', 'Pickle',
+      'Ketchup', 'Soy Sauce', 'Vinegar', 'Baking Powder', 'Baking Soda', 'Honey',
+    ],
+    'Milk & Dairy': [
+      'Milk (Full Cream)', 'Milk (Toned)', 'Curd', 'Paneer', 'Butter', 'Ghee',
+      'Cheese Slices', 'Cheese Block', 'Cream', 'Buttermilk (Chaas)', 'Lassi',
+      'Flavoured Milk', 'Condensed Milk', 'Milk Powder', 'Khoya', 'Yogurt (Sweetened)',
+    ],
+    'Meat & Fish': [
+      'Chicken (Curry Cut)', 'Chicken (Boneless)', 'Chicken Breast', 'Chicken Wings',
+      'Mutton', 'Mutton Keema', 'Fish (Pomfret)', 'Fish (Rohu)', 'Fish (Surmai)',
+      'Prawns', 'Crab', 'Eggs', 'Egg White', 'Bacon', 'Sausages',
+    ],
+    'Snacks & Food Stalls': [
+      'Biscuits (Glucose)', 'Biscuits (Cream)', 'Chips (Potato)', 'Chips (Banana)',
+      'Namkeen (Mixture)', 'Sev', 'Chakli', 'Chocolate', 'Wafers', 'Popcorn',
+      'Bread (White)', 'Bread (Brown)', 'Rusk', 'Cake', 'Cookies', 'Instant Noodles',
+      'Instant Soup', 'Papad (Fried)', 'Peanuts', 'Cashews', 'Almonds', 'Dry Fruits Mix',
+      'Ice Cream', 'Chewing Gum', 'Candy',
+    ],
+  };
+
+  static const List<String> _units = ['kg', 'g', 'L', 'ml', 'piece', 'dozen', 'packet', 'bunch'];
+
+  static const List<String> _emojiOptions = [
+    '🥦', '🍅', '🥔', '🍌', '🍎', '🥬', '🥕', '🍚', '🌾', '🫘',
+    '🧂', '🛢️', '🥛', '🍶', '🧀', '🧈', '🍗', '🐐', '🐟', '🥚',
+    '🍪', '🍟', '🍫', '🛒',
   ];
 
-  Future<void> _save() async {
-    if (_nameController.text.isEmpty || _priceController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all fields')),
-      );
-      return;
-    }
-    setState(() => _isLoading = true);
-    try {
-      final product = ProductModel(
-        id: '',
-        sellerId: widget.vendorId,
-        name: _nameController.text.trim(),
-        price: double.parse(_priceController.text.trim()),
-        category: _category,
-        inStock: _inStock,
-        isVariableStock: _isVariableStock,
-        lastUpdated: DateTime.now(),
-      );
-      await FirestoreService().addProduct(product);
-      if (!mounted) return;
-      Navigator.pop(context);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
-      );
-    }
-    setState(() => _isLoading = false);
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F1EF),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0F7B6C),
-        foregroundColor: Colors.white,
         title: const Text('Add Product'),
-        actions: [
-          TextButton(
-            onPressed: _isLoading ? null : _save,
-            child: const Text('Save',
-                style: TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
-        ],
+        bottom: TabBar(controller: _tabController, tabs: const [
+          Tab(text: 'Common Items'),
+          Tab(text: 'Search Packaged'),
+        ]),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            _field('Product Name', _nameController, Icons.label_outline),
-            const SizedBox(height: 16),
-            _field('Price (₹)', _priceController, Icons.currency_rupee,
-                keyboard: TextInputType.number),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: _category,
-                  isExpanded: true,
-                  items: _categories
-                      .map((c) => DropdownMenuItem(
-                            value: c,
-                            child: Text(c),
-                          ))
-                      .toList(),
-                  onChanged: (val) => setState(() => _category = val!),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('In Stock',
-                      style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF2C2C2C))),
-                  Switch(
-                    value: _inStock,
-                    onChanged: (v) => setState(() => _inStock = v),
-                    activeThumbColor: const Color(0xFF0F7B6C),
+      body: TabBarView(controller: _tabController, children: [
+        _buildCommonItemsTab(),
+        ProductSearchScreen(vendorId: widget.vendorId),
+      ]),
+    );
+  }
+
+  Widget _buildCommonItemsTab() {
+    return Stack(
+      children: [
+        ListView(
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 80),
+          children: _seedCatalogue.entries.map((entry) {
+            return ExpansionTile(
+              title: Text('${entry.key} (${entry.value.length} items)', style: const TextStyle(fontWeight: FontWeight.bold)),
+              children: entry.value.map((itemName) {
+                return ListTile(
+                  title: Text(itemName),
+                  trailing: const Icon(Icons.add_circle_outline, color: Colors.teal),
+                  onTap: () => _openAddItemDialog(prefillName: itemName, prefillCategory: entry.key),
+                );
+              }).toList(),
+            );
+          }).toList(),
+        ),
+        Positioned(
+          bottom: 16,
+          right: 16,
+          child: FloatingActionButton.extended(
+            onPressed: () => _openAddItemDialog(),
+            icon: const Icon(Icons.add),
+            label: const Text('Add Custom Item'),
+            backgroundColor: const Color(0xFF0F7B6C),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _openAddItemDialog({String? prefillName, String? prefillCategory}) {
+    final nameController = TextEditingController(text: prefillName ?? '');
+    final priceController = TextEditingController();
+    final variantController = TextEditingController();
+    String selectedCategory = prefillCategory ?? _seedCatalogue.keys.first;
+    String selectedUnit = _units.first; // Bug #6 fix — unit of measure, was completely missing
+    File? pickedImageFile;
+    String? pickedEmoji;
+    String? errorText;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text(prefillName != null ? 'Add "$prefillName"' : 'Add Custom Item'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (prefillName == null) ...[
+                  TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Product Name')),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: selectedCategory,
+                    decoration: const InputDecoration(labelText: 'Category'),
+                    items: _seedCatalogue.keys.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                    onChanged: (v) => setDialogState(() => selectedCategory = v ?? selectedCategory),
                   ),
+                  const SizedBox(height: 12),
                 ],
-              ),
-            ),
-            if (_category == 'Meat & Fish') ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
+                Row(
                   children: [
-                    Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Variable stock',
-                            style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF2C2C2C))),
-                        Switch(
-                          value: _isVariableStock,
-                          onChanged: (v) =>
-                              setState(() => _isVariableStock = v),
-                          activeThumbColor: const Color(0xFF0F7B6C),
-                        ),
-                      ],
-                    ),
-                    if (_isVariableStock)
-                      const Padding(
-                        padding: EdgeInsets.only(bottom: 8),
-                        child: Text(
-                          'Customer will see "today\'s best available" instead of a fixed weight',
-                          style: TextStyle(
-                              color: Colors.grey, fontSize: 12),
-                        ),
+                    Expanded(
+                      flex: 2,
+                      child: TextField(
+                        controller: priceController,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        autofocus: prefillName != null,
+                        decoration: const InputDecoration(prefixText: '₹', labelText: 'Price', hintText: 'e.g. 40'),
                       ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 1,
+                      child: DropdownButtonFormField<String>(
+                        value: selectedUnit,
+                        decoration: const InputDecoration(labelText: 'Unit'),
+                        items: _units.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                        onChanged: (v) => setDialogState(() => selectedUnit = v ?? selectedUnit),
+                      ),
+                    ),
                   ],
                 ),
-              ),
-            ],
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _save,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE85A2B),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: variantController,
+                  decoration: const InputDecoration(
+                    labelText: 'Quality / Variant (optional)',
+                    hintText: 'e.g. Premium, Regular — only if you sell more than one kind',
+                  ),
                 ),
-                child: _isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Save Product',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold)),
-              ),
+                if (errorText != null) ...[
+                  const SizedBox(height: 8),
+                  Text(errorText!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+                ],
+                const SizedBox(height: 16),
+                const Text('Product Photo', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                if (pickedImageFile != null)
+                  ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.file(pickedImageFile!, height: 100, width: 100, fit: BoxFit.cover))
+                else if (pickedEmoji != null)
+                  Container(height: 100, width: 100, alignment: Alignment.center,
+                      decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(8)),
+                      child: Text(pickedEmoji!, style: const TextStyle(fontSize: 48)))
+                else
+                  Container(height: 100, width: 100, alignment: Alignment.center,
+                      decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(8)),
+                      child: const Icon(Icons.image_not_supported, color: Colors.grey)),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.camera_alt),
+                      onPressed: () async {
+                        final file = await _pickImage(ImageSource.camera);
+                        if (file != null) setDialogState(() { pickedImageFile = file; pickedEmoji = null; });
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.photo_library),
+                      onPressed: () async {
+                        final file = await _pickImage(ImageSource.gallery);
+                        if (file != null) setDialogState(() { pickedImageFile = file; pickedEmoji = null; });
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.emoji_emotions_outlined),
+                      onPressed: () async {
+                        final emoji = await _showEmojiPicker(dialogContext);
+                        if (emoji != null) setDialogState(() { pickedEmoji = emoji; pickedImageFile = null; });
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                final name = nameController.text.trim();
+                final price = double.tryParse(priceController.text);
+                final variant = variantController.text.trim();
+
+                if (name.isEmpty) { setDialogState(() => errorText = 'Enter a product name'); return; }
+                if (price == null || price <= 0) { setDialogState(() => errorText = 'Enter a valid price'); return; }
+
+                final existing = await FirebaseFirestore.instance
+                    .collection('products')
+                    .where('sellerId', isEqualTo: widget.vendorId)
+                    .where('nameLower', isEqualTo: name.toLowerCase())
+                    .get();
+
+                final conflict = existing.docs.any((doc) {
+                  final existingVariant = (doc.data()['variant'] as String? ?? '').toLowerCase();
+                  return existingVariant == variant.toLowerCase();
+                });
+
+                if (conflict) {
+                  setDialogState(() => errorText = existing.docs.isNotEmpty && variant.isEmpty
+                      ? 'You already have "$name" listed. Add a quality label to add it as a second option.'
+                      : 'You already have "$name — $variant" listed.');
+                  return;
+                }
+
+                String? imageBase64;
+                if (pickedImageFile != null) {
+                  imageBase64 = base64Encode(await pickedImageFile!.readAsBytes());
+                }
+
+                await FirebaseFirestore.instance.collection('products').add({
+                  'sellerId': widget.vendorId,
+                  'name': name,
+                  'nameLower': name.toLowerCase(),
+                  'price': price,
+                  'unit': selectedUnit, // Bug #6 fix
+                  if (variant.isNotEmpty) 'variant': variant,
+                  'category': selectedCategory,
+                  'inStock': true,
+                  'isVariableStock': selectedCategory == 'Meat & Fish',
+                  'lastUpdated': FieldValue.serverTimestamp(),
+                  'photoUrl': '',
+                  'source': prefillName != null ? 'seed' : 'custom',
+                  if (imageBase64 != null) 'imageBase64': imageBase64,
+                  if (pickedEmoji != null) 'emoji': pickedEmoji,
+                  'createdAt': FieldValue.serverTimestamp(),
+                });
+
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('$name added to your shop')));
+                }
+              },
+              child: const Text('Save'),
             ),
           ],
         ),
@@ -191,26 +310,26 @@ class _AddProductScreenState extends State<AddProductScreen> {
     );
   }
 
-  Widget _field(String label, TextEditingController controller,
-      IconData icon,
-      {TextInputType keyboard = TextInputType.text}) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboard,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, color: const Color(0xFF0F7B6C)),
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide:
-              const BorderSide(color: Color(0xFF0F7B6C), width: 1.5),
-        ),
+  Future<File?> _pickImage(ImageSource source) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: source, imageQuality: 40, maxWidth: 600);
+    if (picked == null) return null;
+    return File(picked.path);
+  }
+
+  Future<String?> _showEmojiPicker(BuildContext context) {
+    return showModalBottomSheet<String>(
+      context: context,
+      builder: (sheetContext) => GridView.count(
+        crossAxisCount: 6,
+        padding: const EdgeInsets.all(16),
+        shrinkWrap: true,
+        children: _emojiOptions.map((emoji) {
+          return IconButton(
+            icon: Text(emoji, style: const TextStyle(fontSize: 28)),
+            onPressed: () => Navigator.pop(sheetContext, emoji),
+          );
+        }).toList(),
       ),
     );
   }

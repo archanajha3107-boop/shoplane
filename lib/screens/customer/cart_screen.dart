@@ -4,6 +4,7 @@ import '../../models/product_model.dart';
 import '../../models/order_model.dart';
 import '../../services/firestore_service.dart';
 import 'order_confirmation_screen.dart';
+import '../../constants/app_colors.dart';
 
 class CartScreen extends StatefulWidget {
   final Map<ProductModel, int> cart;
@@ -28,7 +29,7 @@ class _CartScreenState extends State<CartScreen> {
   @override
   void initState() {
     super.initState();
-    _cart = Map.from(widget.cart);
+    _cart = Map<ProductModel, int>.from(widget.cart);
   }
 
   double get _subtotal =>
@@ -106,7 +107,7 @@ class _CartScreenState extends State<CartScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF2F1EF),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0F7B6C),
+        backgroundColor: AppColors.emerald,
         foregroundColor: Colors.white,
         title: const Text('Your Cart'),
       ),

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/product_model.dart';
 import '../models/order_model.dart';
 import '../models/user_model.dart';
+import 'notification_service.dart';
 import 'dart:math';
 
 class FirestoreService {
@@ -99,26 +100,54 @@ class FirestoreService {
     });
   }
 
+  Map<String, dynamic> buildKhataEntry({
+    required String vendorId,
+    required String customerId,
+    required String customerName,
+    required String customerPhone,
+    required String orderId,
+    required double amount,
+  }) {
+    return {
+      'vendorId': vendorId,
+      'customerId': customerId,
+      'customerName': customerName,
+      'customerPhone': customerPhone,
+      'orderId': orderId,
+      'amount': amount,
+      'createdAt': FieldValue.serverTimestamp(),
+      'paid': false,
+    };
+  }
+
   Future<String> placeOrder(OrderModel order) async {
     final ref = await _db.collection('orders').add(order.toMap());
 
     try {
-      final vendorDoc = await _db
-          .collection('users')
-          .doc(order.sellerId)
-          .get();
-      final vendorToken =
-          vendorDoc.data()?['fcmToken'] as String? ?? '';
-      if (vendorToken.isNotEmpty) {
-        await sendOrderNotification(
-          vendorFcmToken: vendorToken,
-          customerName: order.customerName,
-          total: order.total,
-          orderId: ref.id,
-        );
-      }
+      await NotificationService.notifyVendorNewOrder(
+        vendorId: order.sellerId,
+        customerName: order.customerName,
+        total: order.total,
+        orderId: ref.id,
+      );
     } catch (e) {
-      // Notification failure should not block order placement
+      // Notification failure should not block order placement.
+    }
+
+    if (order.paymentMethod == 'Khata Credit') {
+      final customerDoc = await _db.collection('users').doc(order.customerId).get();
+      final customerName =
+          (customerDoc.data()?['name'] as String?) ?? order.customerName;
+      final customerPhone = (customerDoc.data()?['phone'] as String?) ?? '';
+
+      await _db.collection('khataEntries').add(buildKhataEntry(
+        vendorId: order.sellerId,
+        customerId: order.customerId,
+        customerName: customerName,
+        customerPhone: customerPhone,
+        orderId: ref.id,
+        amount: order.total,
+      ));
     }
 
     return ref.id;
@@ -138,7 +167,20 @@ class FirestoreService {
   }
 
   Future<void> updateOrderStatus(String orderId, String status) async {
+    final order = status == 'accepted' ? await getOrder(orderId) : null;
     await _db.collection('orders').doc(orderId).update({'status': status});
+
+    if (order != null) {
+      try {
+        await NotificationService.notifyCustomerOrderAccepted(
+          customerId: order.customerId,
+          shopName: order.shopName,
+          orderId: orderId,
+        );
+      } catch (e) {
+        // Notification failure should not block status updates.
+      }
+    }
   }
 
   Future<void> flagOrderIssue(String orderId, String reason) async {

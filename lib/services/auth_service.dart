@@ -39,6 +39,7 @@ class AuthService {
       return null;
     }
   }
+
   Future<OrderModel?> getLastOrderFromShop(
     String customerId, String sellerId) async {
   final snap = await _db
@@ -181,6 +182,22 @@ class AuthService {
       // Fetches user data from Firestore after login
       DocumentSnapshot doc =
           await _db.collection('users').doc(user.uid).get();
+
+      // THIS WAS THE BUG: doc.data() can be null if no Firestore profile
+      // exists for this UID (e.g. signup's Firestore write never completed,
+      // or the document was deleted during testing). Casting null straight
+      // to Map<String, dynamic> throws a raw TypeError — which isn't a
+      // FirebaseAuthException or PlatformException, so it fell through
+      // formatAuthError()'s switch statements straight to the generic
+      // "Something went wrong. Please try again." fallback, hiding the
+      // real cause completely.
+      if (!doc.exists || doc.data() == null) {
+        throw AuthFailure(
+          'Your login was successful, but no profile data was found for this account. '
+          'This can happen if signup was interrupted. Please contact support or try signing up again.',
+        );
+      }
+
       await updateFcmToken(user.uid);
       return UserModel.fromMap(
           doc.data() as Map<String, dynamic>, user.uid);

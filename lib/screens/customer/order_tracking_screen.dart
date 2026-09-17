@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/order_model.dart';
 import '../../services/firestore_service.dart';
 
-class OrderTrackingScreen extends StatelessWidget {
+class OrderTrackingScreen extends StatefulWidget {
   final String orderId;
   const OrderTrackingScreen({super.key, required this.orderId});
+
+  @override
+  State<OrderTrackingScreen> createState() => _OrderTrackingScreenState();
+}
+
+class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
+  String? _previousStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -15,38 +23,40 @@ class OrderTrackingScreen extends StatelessWidget {
         foregroundColor: Colors.white,
         title: const Text('Track Order'),
       ),
-      body: StreamBuilder<List<OrderModel>>(
-        stream: FirestoreService().customerOrders(''),
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('orders')
+            .doc(widget.orderId)
+            .snapshots(),
         builder: (context, snapshot) {
-          return FutureBuilder<OrderModel?>(
-            future: _getOrder(orderId),
-            builder: (context, snap) {
-              if (snap.connectionState == ConnectionState.waiting) {
-                return const Center(
-                    child: CircularProgressIndicator(
-                        color: Color(0xFF0F7B6C)));
-              }
-              final order = snap.data;
-              if (order == null) {
-                return const Center(child: Text('Order not found'));
-              }
-              return _buildBody(context, order);
-            },
-          );
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+                child: CircularProgressIndicator(
+                    color: Color(0xFF0F7B6C)));
+          }
+          
+          final doc = snapshot.data;
+          if (!snapshot.hasData || doc == null || !doc.exists) {
+            return const Center(child: Text('Order not found'));
+          }
+
+          final order = OrderModel.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+          
+          // Inside the StreamBuilder watching this order's document, when status changes to 'Accepted':
+          if (_previousStatus != null && _previousStatus != 'Accepted' && order.status == 'Accepted') {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Your order has been accepted! 🎉'), backgroundColor: Color(0xFF0F7B6C)),
+              );
+            });
+          }
+          
+          _previousStatus = order.status;
+          
+          return _buildBody(context, order);
         },
       ),
     );
-  }
-
-  Future<OrderModel?> _getOrder(String id) async {
-    // Uses Firestore directly for single doc fetch
-    final fs = FirestoreService();
-    try {
-      final doc = await fs.getOrder(id);
-      return doc;
-    } catch (e) {
-      return null;
-    }
   }
 
   Widget _buildBody(BuildContext context, OrderModel order) {

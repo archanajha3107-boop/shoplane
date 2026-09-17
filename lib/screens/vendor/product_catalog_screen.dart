@@ -22,6 +22,27 @@ class ProductCatalogScreen extends StatelessWidget {
               child: CircularProgressIndicator(
                   color: Color(0xFF0F7B6C)));
         }
+        // THIS WAS MISSING — a parsing error on any product document (e.g. a
+        // missing required field) was silently falling through to "No products
+        // yet" with zero indication anything had gone wrong. Now it shows the
+        // real error instead of hiding it.
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                  const SizedBox(height: 12),
+                  Text('Couldn\'t load products:\n${snapshot.error}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.red, fontSize: 13)),
+                ],
+              ),
+            ),
+          );
+        }
         final products = snapshot.data ?? [];
         if (products.isEmpty) {
           return const Center(

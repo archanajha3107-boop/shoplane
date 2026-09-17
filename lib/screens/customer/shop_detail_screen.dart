@@ -4,6 +4,7 @@ import '../../models/product_model.dart';
 import '../../models/order_model.dart';
 import '../../services/firestore_service.dart';
 import 'cart_screen.dart';
+import 'grouped_product_card.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ShopDetailScreen extends StatefulWidget {
@@ -21,10 +22,10 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
   OrderModel? _lastOrder;
 
   double get _cartTotal => _cart.entries
-      .fold(0, (sum, e) => sum + e.key.price * e.value);
+      .fold(0, (total, e) => total + e.key.price * e.value);
 
   int get _cartCount =>
-      _cart.values.fold(0, (sum, qty) => sum + qty);
+      _cart.values.fold(0, (total, qty) => total + qty);
 
   @override
   void initState() {
@@ -40,19 +41,20 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
     if (mounted) setState(() => _lastOrder = order);
   }
 
-  void _addToCart(ProductModel product) {
-    setState(() {
-      _cart[product] = (_cart[product] ?? 0) + 1;
-    });
-  }
+  void _addGroupedVariantToCart(GroupedProduct product, ProductVariant selectedVariant, int quantity) {
+    final variantProduct = ProductModel(
+      id: selectedVariant.productId,
+      sellerId: widget.vendor.uid,
+      name: product.name,
+      price: selectedVariant.price,
+      category: widget.vendor.category ?? 'General',
+      inStock: true,
+      isVariableStock: product.variants.length > 1,
+      lastUpdated: DateTime.now(),
+    );
 
-  void _removeFromCart(ProductModel product) {
     setState(() {
-      if ((_cart[product] ?? 0) <= 1) {
-        _cart.remove(product);
-      } else {
-        _cart[product] = _cart[product]! - 1;
-      }
+      _cart[variantProduct] = (_cart[variantProduct] ?? 0) + quantity;
     });
   }
 
@@ -148,152 +150,39 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
               ),
             ),
           Expanded(
-            child: StreamBuilder<List<ProductModel>>(
-              stream: FirestoreService()
-                  .shopProducts(widget.vendor.uid),
+            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance
+                  .collection('products')
+                  .where('sellerId', isEqualTo: widget.vendor.uid)
+                  .where('inStock', isEqualTo: true)
+                  .snapshots(),
               builder: (context, snapshot) {
-                if (snapshot.connectionState ==
-                    ConnectionState.waiting) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
-                      child: CircularProgressIndicator(
-                          color: Color(0xFF0F7B6C)));
-                }
-                final products = snapshot.data ?? [];
-                if (products.isEmpty) {
-                  return const Center(
-                    child: Text('No products available',
-                        style: TextStyle(color: Colors.grey)),
+                    child: CircularProgressIndicator(color: Color(0xFF0F7B6C)),
                   );
                 }
-                return GridView.builder(
+
+                final docs = snapshot.data?.docs ?? [];
+                if (docs.isEmpty) {
+                  return const Center(
+                    child: Text('No products available', style: TextStyle(color: Colors.grey)),
+                  );
+                }
+
+                final rawProductMaps = docs.map((doc) => doc.data()).toList();
+                final docIds = docs.map((doc) => doc.id).toList();
+                final grouped = groupProductsByName(rawProductMaps, docIds);
+
+                return ListView.builder(
                   padding: const EdgeInsets.all(16),
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 0.85,
-                  ),
-                  itemCount: products.length,
+                  itemCount: grouped.length,
                   itemBuilder: (context, i) {
-                    final p = products[i];
-                    final qty = _cart[p] ?? 0;
-                    return Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            height: 70,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF0F7B6C)
-                                  .withValues(alpha: 0.08),
-                              borderRadius:
-                                  BorderRadius.circular(8),
-                            ),
-                            child: const Center(
-                              child: Icon(
-                                  Icons.shopping_basket_outlined,
-                                  color: Color(0xFF0F7B6C)),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(p.name,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                  color: Color(0xFF2C2C2C))),
-                          if (p.isVariableStock)
-                            const Text("Today's best available",
-                                style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.grey)),
-                          Text(
-                            '₹${p.price.toStringAsFixed(0)}',
-                            style: const TextStyle(
-                                color: Color(0xFF0F7B6C),
-                                fontWeight: FontWeight.bold),
-                          ),
-                          const Spacer(),
-                          qty == 0
-                              ? SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton(
-                                    onPressed: () =>
-                                        _addToCart(p),
-                                    style:
-                                        ElevatedButton.styleFrom(
-                                      backgroundColor:
-                                          const Color(0xFFE85A2B),
-                                      foregroundColor:
-                                          Colors.white,
-                                      padding: const EdgeInsets
-                                          .symmetric(vertical: 6),
-                                      shape:
-                                          RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(8),
-                                      ),
-                                    ),
-                                    child: const Text('Add'),
-                                  ),
-                                )
-                              : Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    GestureDetector(
-                                      onTap: () =>
-                                          _removeFromCart(p),
-                                      child: Container(
-                                        padding:
-                                            const EdgeInsets.all(4),
-                                        decoration: BoxDecoration(
-                                          color: const Color(
-                                                  0xFF0F7B6C)
-                                              .withValues(alpha: 0.1),
-                                          borderRadius:
-                                              BorderRadius.circular(6),
-                                        ),
-                                        child: const Icon(Icons.remove,
-                                            size: 16,
-                                            color:
-                                                Color(0xFF0F7B6C)),
-                                      ),
-                                    ),
-                                    Text('$qty',
-                                        style: const TextStyle(
-                                            fontWeight:
-                                                FontWeight.bold,
-                                            color:
-                                                Color(0xFF2C2C2C))),
-                                    GestureDetector(
-                                      onTap: () => _addToCart(p),
-                                      child: Container(
-                                        padding:
-                                            const EdgeInsets.all(4),
-                                        decoration: BoxDecoration(
-                                          color: const Color(
-                                                  0xFF0F7B6C)
-                                              .withValues(alpha: 0.1),
-                                          borderRadius:
-                                              BorderRadius.circular(6),
-                                        ),
-                                        child: const Icon(Icons.add,
-                                            size: 16,
-                                            color:
-                                                Color(0xFF0F7B6C)),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                        ],
-                      ),
+                    final product = grouped[i];
+                    return GroupedProductCard(
+                      product: product,
+                      onAddToCart: (groupedProduct, selectedVariant, qty) =>
+                          _addGroupedVariantToCart(groupedProduct, selectedVariant, qty),
                     );
                   },
                 );
@@ -315,8 +204,7 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                 ],
               ),
               child: Row(
-                mainAxisAlignment:
-                    MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
                     '$_cartCount items • ₹${_cartTotal.toStringAsFixed(0)}',
@@ -343,22 +231,18 @@ class _ShopDetailScreenState extends State<ShopDetailScreen> {
                     ),
                     child: const Text('View Cart'),
                   ),
-                  IconButton(
-  icon: const Icon(Icons.person_add_alt_1_rounded),
-  onPressed: () async {
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(widget.customer.uid)
-        .collection('myShops')
-        .doc(widget.vendor.uid)
-        .set({'savedAt': FieldValue.serverTimestamp()});
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Added to Uncle shops!'), backgroundColor: Color(0xFF0F7B6C)),
-      );
-    }
-  },
-),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.favorite_border),
+                    label: const Text('Add to Uncle'),
+                    onPressed: () async {
+                      await FirestoreService().saveShop(widget.customer.uid, widget.vendor.uid);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Saved to Uncle')),
+                        );
+                      }
+                    },
+                  ),
                 ],
               ),
             ),

@@ -5,6 +5,9 @@ import '../../services/firestore_service.dart';
 import '../role_selection_screen.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'esp32_ble_pairing_screen.dart';
+import '../customer/location_picker_screen.dart'; 
+import 'esp32_setup_screen.dart';
 
 class VendorSettingsScreen extends StatefulWidget {
   final UserModel vendor;
@@ -34,31 +37,40 @@ class _VendorSettingsScreenState extends State<VendorSettingsScreen> {
   }
 
   Future<void> _updateLocation() async {
-    try {
-      final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-        ),
-      );
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.vendor.uid)
-          .update({'location': GeoPoint(pos.latitude, pos.longitude)});
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Location updated successfully'),
-          backgroundColor: Color(0xFF0F7B6C),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Location update failed: $e')));
-    }
-  }
+  final result = await Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => LocationPickerScreen(
+        initialLat: widget.vendor.location?.latitude,
+        initialLng: widget.vendor.location?.longitude,
+      ),
+    ),
+  );
 
+  if (result == null) return; // vendor backed out of the picker, do nothing
+
+  try {
+    final lat = result['lat'] as double;
+    final lng = result['lng'] as double;
+
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.vendor.uid)
+        .update({'location': GeoPoint(lat, lng)});
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Location updated successfully'),
+        backgroundColor: Color(0xFF0F7B6C),
+      ),
+    );
+  } catch (e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Location update failed: $e')));
+  }
+}
   Future<void> _save() async {
     setState(() => _saving = true);
     await FirestoreService().updateVendorSettings(widget.vendor.uid, {
@@ -122,6 +134,16 @@ class _VendorSettingsScreenState extends State<VendorSettingsScreen> {
                 ),
               ),
               const Divider(height: 1),
+              ListTile(
+  leading: const Icon(Icons.bluetooth_searching),
+  title: const Text('Set Up Hardware'),
+  trailing: const Icon(Icons.chevron_right),
+  onTap: () => Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (_) => Esp32SetupScreen(vendorId: widget.vendor.uid),
+ )),
+),
               ListTile(
                 title: const Text('Min Order Value (₹)'),
                 trailing: SizedBox(

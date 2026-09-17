@@ -16,6 +16,7 @@ class UserModel {
   final String? businessName;
   final String? category;
   final String? shopPhoto;
+  final String? emoji;
   final bool? isOpen;
   final bool? offersDelivery;
   final bool? offersPickup;
@@ -39,6 +40,7 @@ class UserModel {
     this.businessName,
     this.category,
     this.shopPhoto,
+    this.emoji,
     this.isOpen,
     this.offersDelivery,
     this.offersPickup,
@@ -65,6 +67,7 @@ class UserModel {
       businessName: map['businessName'],
       category: map['category'],
       shopPhoto: map['shopPhoto'],
+      emoji: map['emoji'],
       isOpen: map['isOpen'],
       offersDelivery: map['offersDelivery'],
       offersPickup: map['offersPickup'],
@@ -91,6 +94,7 @@ class UserModel {
       if (businessName != null) 'businessName': businessName,
       if (category != null) 'category': category,
       if (shopPhoto != null) 'shopPhoto': shopPhoto,
+      if (emoji != null) 'emoji': emoji,
       if (isOpen != null) 'isOpen': isOpen,
       if (offersDelivery != null) 'offersDelivery': offersDelivery,
       if (offersPickup != null) 'offersPickup': offersPickup,

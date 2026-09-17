@@ -1,153 +1,114 @@
 import 'package:flutter/material.dart';
 import '../../models/user_model.dart';
-import '../../services/vendor_matching_service.dart';
-import 'shop_detail_screen.dart';
+import '../../services/vendor_matcher.dart';
 
-class VendorMatchResultsScreen extends StatefulWidget {
+class VendorMatchResultsScreen extends StatelessWidget {
+  final SetCoverResult matchResult;
   final UserModel customer;
-  final List<String> wishlist;
-  const VendorMatchResultsScreen({super.key, required this.customer, required this.wishlist});
+  final List<String> wishlist; // Added wishlist parameter
 
-  @override
-  State<VendorMatchResultsScreen> createState() => _VendorMatchResultsScreenState();
-}
-
-class _VendorMatchResultsScreenState extends State<VendorMatchResultsScreen> {
-  List<VendorMatch> _matches = [];
-  List<VendorMatch> _fullMatch = [];
-  List<VendorMatch> _splitPlan = [];
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _findMatches();
-  }
-
-  Future<void> _findMatches() async {
-    final lat = widget.customer.location?.latitude ?? 19.0760;
-    final lng = widget.customer.location?.longitude ?? 72.8777;
-    final results = await VendorMatchingService().matchVendors(
-      wishlistNames: widget.wishlist,
-      customerLat: lat,
-      customerLng: lng,
-    );
-    final fullMatch = results.where((m) => m.matchedItemCount == m.totalCartItems).toList();
-    final splitPlan = fullMatch.isEmpty
-    ? VendorMatchingService().greedySetCover(results, widget.wishlist)
-    : <VendorMatch>[];    if (mounted) setState(() {
-      _matches = results;
-      _fullMatch = fullMatch;
-      _splitPlan = splitPlan;
-      _loading = false;
-    });
-  }
+  const VendorMatchResultsScreen({
+    super.key,
+    required this.matchResult,
+    required this.customer,
+    required this.wishlist, // Mark as required
+  });
 
   @override
   Widget build(BuildContext context) {
+    final matches = matchResult.matches;
+    final unavailable = matchResult.unavailableItems;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F1EF),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0F7B6C),
-        foregroundColor: Colors.white,
-        title: const Text('Best matches near you'),
+        title: Text('Vendor Match Results for ${customer.name ?? "Customer"}'),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF0F7B6C)))
-          : _matches.isEmpty
-              ? const Center(child: Text('No nearby shops have these items', style: TextStyle(color: Colors.grey)))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _matches.length + (_fullMatch.isEmpty && _splitPlan.isNotEmpty ? 1 : 0),
-                  itemBuilder: (context, i) {
-                    if (_fullMatch.isEmpty && _splitPlan.isNotEmpty && i == 0) {
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFC9A227).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+      body: matches.isEmpty && unavailable.isEmpty
+          ? const Center(
+              child: Text('No items in the shopping list.'),
+            )
+          : ListView(
+              padding: const EdgeInsets.all(16.0),
+              children: [
+                if (matches.isNotEmpty) ...[
+                  const Text(
+                    'Matched Vendors',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ...matches.map((match) {
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              'No single shop has everything — smart split suggested:',
-                              style: TextStyle(
+                            Text(
+                              match.vendor.name ?? 'Local Vendor',
+                              style: const TextStyle(
+                                fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFFC9A227),
-                                fontSize: 13,
                               ),
                             ),
                             const SizedBox(height: 6),
-                            ..._splitPlan.map((m) => Text(
-                                  '• ${m.vendor.businessName ?? m.vendor.name} — ${m.matchedItemCount} items',
-                                  style: const TextStyle(fontSize: 12, color: Color(0xFF2C2C2C)),
-                                )),
+                            const Text(
+                              'Covered Items:',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Wrap(
+                              spacing: 6.0,
+                              runSpacing: 4.0,
+                              children: match.itemsCovered.map((item) {
+                                return Chip(
+                                  label: Text(item),
+                                  backgroundColor: Colors.green.shade50,
+                                );
+                              }).toList(),
+                            ),
                           ],
                         ),
-                      );
-                    }
-                    final matchIndex = _fullMatch.isEmpty && _splitPlan.isNotEmpty ? i - 1 : i;
-                    final m = _matches[matchIndex];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Text(m.vendor.businessName ?? m.vendor.name,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF2C2C2C))),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: m.matchedItemCount == m.totalCartItems
-                                      ? const Color(0xFF0F7B6C).withValues(alpha: 0.1)
-                                      : const Color(0xFFC9A227).withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  '${m.matchedItemCount}/${m.totalCartItems} items',
-                                  style: TextStyle(
-                                    fontSize: 11, fontWeight: FontWeight.bold,
-                                    color: m.matchedItemCount == m.totalCartItems ? const Color(0xFF0F7B6C) : const Color(0xFFC9A227),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text('${m.distanceKm.toStringAsFixed(1)} km away · ${m.vendor.category ?? ""}',
-                              style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ShopDetailScreen(vendor: m.vendor, customer: widget.customer),
-                                ),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFE85A2B),
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              child: const Text('View shop & order', style: TextStyle(fontWeight: FontWeight.bold)),
-                            ),
-                          ),
-                        ],
                       ),
                     );
-                  },
-                ),
+                  }),
+                ],
+                if (unavailable.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Unavailable Items',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Card(
+                    color: Colors.red.shade50,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Wrap(
+                        spacing: 6.0,
+                        runSpacing: 4.0,
+                        children: unavailable.map((item) {
+                          return Chip(
+                            label: Text(item),
+                            backgroundColor: Colors.white,
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
     );
   }
 }
